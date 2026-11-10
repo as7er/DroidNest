@@ -2,54 +2,45 @@
 
 运行在 Windows 上的无广告 Android 桌面客户端。手机画面和控制面板在同一个窗口中，支持鼠标触摸、键盘输入、APK 安装、横竖屏与全屏。
 
-**重要：GitHub Release 是客户端，不是完整模拟器安装包。单独下载 `DroidNest.exe` 不能运行 APK。** Android 引擎、系统镜像和视频组件需要另外准备；公开 ZIP 不包含运行时、手机数据或密钥。
+**v0.2.0：下载客户端 ZIP，首次打开后由图形向导在线安装运行时，无需自己准备 SDK、JDK 或运行组件准备脚本。** 公开 ZIP 仍不捆绑第三方运行时，也不是离线完整模拟器；单独下载 EXE 不足以完成首次安装。
 
-## 下载与启动
+## 下载与首次启动
 
 仓库：<https://github.com/as7er/DroidNest>
 
-下载 Release 中的 `DroidNest-v0.1.0-win-x64-client.zip`，解压到当前用户可写的目录。优先双击 `Start-DroidNest.cmd`，它会检查依赖并给出错误原因；也可以直接打开 `DroidNest.exe`，客户端会再次检查 Android 运行条件。
+1. 下载 `DroidNest-v0.2.0-win-x64-client.zip`，核对发布页的 SHA-256，完整解压（不要在 ZIP 内直接运行）。保留 `tools/SignWebView.java` 等随包文件。
+2. 双击 `Start-DroidNest.cmd`。启动器检查 Windows/x64、.NET 和客户端文件；**不会因为尚未安装 Android 运行时而拒绝打开向导**。
+3. 向导先检查安装所需的宿主条件。WHPX 未启用时会说明原因并提供打开“Windows 功能”的按钮；先按提示启用并重启，条件满足后才读取在线元数据，不会先下载组件。随后显示组件、版本、来源、实际下载大小、条款/许可链接及公开测试密钥风险。阅读后明确勾选同意，才开始下载、解压及本地准备；取消或不接受不会开始组件安装。
+4. 保持网络连接并观察进度。向导自动获取 Android Emulator、Platform Tools、Android 11 / API 30 `default;x86_64` 镜像、scrcpy 和 WebView，以及仅供本地准备使用的私有 JDK 与 Android Build Tools；无需修改系统 Java/SDK 配置。下载失败时按界面提示重试；关闭后可重新打开客户端继续安装流程。不要为了重试删除手机数据目录。
+5. 安装完成后进入主界面并自动启动已准备的手机；以后打开客户端也会自动启动手机。首次冷启动需要等待 Android 就绪，手动停止后可点击“启动手机”重新启动。
 
-- Windows 10/11，x64 Intel/AMD 处理器；不支持 Windows ARM。
-- .NET Framework 4.8。尚未安装时，启动脚本会报告缺失，EXE 本身无法在缺失 CLR 时显示自己的提示。
-- BIOS/UEFI 开启 Intel VT-x/AMD-V，Windows 功能开启 **Windows Hypervisor Platform / Windows 虚拟机监控程序平台（WHPX）**。更改后可能需要重启。
-- 给手机分配 2 个虚拟 CPU、2 GB 内存；宿主机同时运行其他模拟器时可能明显变慢。
-- 首次启动需为虚拟磁盘预留至少 8 GB 可用空间；运行时文件还会占用额外空间。
-- 本地端口 5048、5580、5581 必须可用。DroidNest 不抢占端口、不结束其他模拟器、不自动开启 Windows 功能。
+客户端不会静默代替用户接受组件条款，不会自动提权、关闭安全防护或更改虚拟化功能。网络代理、企业防火墙或上游不可用可能导致元数据/下载失败；保留错误信息排查，不要绕过 HTTPS 证书校验。
 
-运行环境满足后点击“启动手机”。关闭窗口会停止本实例的 Android 和视频进程，不清除应用数据。
+### 宿主要求
 
-## 准备本机运行时
+- Windows 10/11，Intel/AMD x64；不支持 Windows ARM。
+- [.NET Framework 4.8](https://dotnet.microsoft.com/download/dotnet-framework/net48)。缺失时启动器会报告，EXE 自身无法在缺失 CLR 时显示向导。
+- BIOS/UEFI 开启 Intel VT-x/AMD-V；Windows 功能开启 **Windows Hypervisor Platform / Windows 虚拟机监控程序平台（WHPX）**，更改后重启。向导安装组件不能替代这些宿主设置。
+- 建议至少 8 GB 主机内存；手机使用 2 个虚拟 CPU、2 GB 内存。同时运行其他模拟器可能明显变慢。
+- 持久目录所在磁盘除下载及解压空间外，还需为虚拟磁盘预留至少 8 GiB 可用空间；下载缓存、安装暂存和旧运行时保留会额外占用空间。
+- 本地端口 5048、5580、5581 必须可用；DroidNest 不抢占端口、不结束其他模拟器。
 
-当前经过验证的配置是 Android 11 / API 30 `default;x86_64` 镜像 + Android Emulator + WHPX + scrcpy 5.0.1。
+## 数据位置、更新与旧版迁移
 
-1. 从 Android 官方渠道准备 Android SDK，并自行阅读、接受适用条款。安装组件：`emulator`、`platform-tools`、`system-images;android-30;default;x86_64`。不需要安装其他商业模拟器。
-2. 在 DroidNest 解压目录运行：
+程序目录只放客户端、配置及随包辅助文件。运行状态保存在当前 Windows 用户的固定目录：
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\Import-LocalRuntime.ps1 -SdkPath "C:\path\to\Android\sdk"
+```text
+%LOCALAPPDATA%\DroidNest\
+  runtime\   已安装的 Android / scrcpy / 本地 WebView
+  data\      手机虚拟磁盘、应用和 Android 用户配置
+  logs\      运行诊断记录
 ```
 
-导入脚本拒绝覆盖已有 `runtime/sdk`，不复制其他虚拟手机的数据，也不代替用户接受 SDK 许可。
+**更新客户端不需要重新安装运行时，也不应覆盖或删除 `data`。** 正常关闭 DroidNest 后，把新版客户端 ZIP 解压到新目录并启动即可；同一 Windows 用户继续使用上述持久目录。删除旧客户端目录之前，确认旧版数据已经迁移并另做备份。不要同时运行两份客户端。
 
-3. 准备本地 JDK 21 或更高版本，以及 Android SDK Build Tools 的 `lib/apksigner.jar`，运行：
+旧版将 `runtime`、`data` 放在 EXE 旁边。先关闭旧版及其手机进程，把新版客户端文件放入保留旧目录的解压位置，再由新版启动时的迁移提示明确同意后复制；不要把运行中的虚拟磁盘手工搬走。迁移只复制持久目录中尚不存在的对应文件夹，保留旧目录原件，不覆盖已有持久运行时或手机数据。若目标已经存在，不会自动合并两部手机；先备份并确认需保留的数据。完整的旧版运行时可以直接复用；缺少必要文件时会进入安装向导修复，不删除已迁移的手机数据。
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\Setup-Components.ps1 -JavaHome "C:\path\to\jdk" -ApkSignerJar "C:\path\to\sdk\build-tools\35.0.0\lib\apksigner.jar"
-```
-
-脚本下载并校验固定版本的 scrcpy 和 LineageOS WebView。当前开发镜像内置 WebView 83，无法解析部分现代应用的 JavaScript；本地更新升级到 156.0.8078.47。启动时检查 WebView 提供程序，必要时安装已准备的本地更新，不在启动时联网下载。
-
-**签名边界：** 当前 Android 镜像使用公开 AOSP 测试证书。WebView 使用匹配证书本地重签名，保留 Android 签名校验，不修改业务 APK。公开测试密钥不适用于生产发行或敏感数据；升级 WebView 不会升级 Android 内核和系统安全补丁。
-
-4. 执行环境检查：
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\Check-Environment.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\Check-Environment.ps1 -Json
-```
-
-检查程序不要求管理员权限，不修改虚拟化设置；缺少组件会阻止启动并提示补齐方式。
+关闭窗口时先刷新 Android 存储，再停止本实例 Android 和视频进程，不清除手机应用数据。备份或迁移之前必须正常停止手机；备份 `data` 可能包含账号、凭据及个人信息。
 
 ## 操作
 
@@ -61,41 +52,56 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Check-Environment.ps1 -Jso
 - 在 Android 应用抽屉打开应用，在 Android 设置中卸载。
 - 默认不自动同步 Windows 与 Android 剪贴板。视频限制 30 FPS / 4 Mbps，声音由 Android 引擎输出，不重复转发。
 
-## 便携包与个人迁移
+## 诊断（可选，不是安装步骤）
 
-先构建客户端，然后整理公开客户端便携包：
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Check-Environment.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Check-Environment.ps1 -Json
+```
+
+默认模式诊断完整运行条件，包括持久目录权限/空间、安装文件、WHPX、内存与端口；不会下载或启动客户端，缺失组件返回非零退出码。JSON 同时报告 `root`（持久目录）和 `appRoot`（客户端目录）。诊断可能创建持久根目录及即时删除的写入探针，不预先创建手机数据目录。`-Launch` 是启动器模式，仅检查打开客户端所需条件，缺少运行时由图形向导处理，不重复实现 PowerShell 安装器。
+
+## 开发打包与个人迁移
+
+以下命令只用于开发/个人备份，不是新用户安装要求。先构建客户端，再生成公开 ZIP：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\New-PortablePackage.ps1 -Version 0.1.0
+powershell -NoProfile -ExecutionPolicy Bypass -File .\New-PortablePackage.ps1 -Version 0.2.0
 ```
 
-产物位于 `dist/`，包含客户端、启动检查、组件准备脚本与说明，**不包含 `runtime/` 或 `data/`**。附带 SHA-256 校验文件。脚本拒绝覆盖已有同名产物。
+`dist/` 产物采用客户端文件白名单，包含 EXE、配置、启动与诊断脚本、`tools/SignWebView.java`、许可和说明；**不包含运行时、私有准备工具、下载缓存、手机数据、日志或密钥**。附带 SHA-256 校验文件，拒绝覆盖同名产物。旧版 `Setup-Components.ps1` 和 `Import-LocalRuntime.ps1` 已移除，安装由客户端完成。
 
-迁移自己的完整运行环境：先正常关闭 DroidNest，再运行：
+迁移自己的已安装环境：正常关闭全部 DroidNest，再运行：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\New-PortablePackage.ps1 -Version 0.1.0 -Mode Local
-# 只有明确需要迁移现有手机数据时：
-powershell -NoProfile -ExecutionPolicy Bypass -File .\New-PortablePackage.ps1 -Version 0.1.0 -Mode Local -IncludeData
+powershell -NoProfile -ExecutionPolicy Bypass -File .\New-PortablePackage.ps1 -Mode Local
+# 仅明确需要迁移当前手机数据时：
+powershell -NoProfile -ExecutionPolicy Bypass -File .\New-PortablePackage.ps1 -Mode Local -IncludeData
 ```
 
-`LOCAL-ONLY` 包只用于个人迁移，不是公开分发许可。默认不含手机数据；`-IncludeData` 可能包含账号凭据、应用内容和个人信息，切勿上传 GitHub。不要复制运行中的虚拟磁盘。换电脑后仍需满足硬件虚拟化和系统依赖。
+Local 模式从 `%LOCALAPPDATA%\DroidNest` 读取已安装运行时，若有安装记录则一并保留；完整旧运行时不强制要求记录。默认不含手机数据，也不包含私有 JDK、构建工具、下载缓存或签名密钥。目标电脑完整解压后启动，由迁移提示导入持久目录；目标已有数据时不要覆盖。`LOCAL-ONLY` 包只用于个人迁移，**不是第三方再分发许可，不得上传 GitHub Release**。`-IncludeData` 可能携带账号凭据和个人信息，必须保密；换电脑仍需满足宿主条件。
 
 ## 构建源码
 
-自有代码使用 C# 5 / WPF / .NET Framework 4.8，不依赖 NuGet。`build.ps1` 使用 Windows 自带 Framework 编译器。也可使用 Visual Studio 打开 `DroidNest.csproj` 并安装 .NET Framework 4.8 开发工具。
+自有代码使用 C# 5 / WPF / .NET Framework 4.8，不依赖 NuGet。`build.ps1` 使用 Windows 自带 Framework 编译器。也可用 Visual Studio 打开 `DroidNest.csproj` 并安装 .NET Framework 4.8 开发工具。
 
-`runtime/`、`data/`、`logs/`、`verification/`、`dist/` 和密钥材料都被排除在版本控制之外。不要使用强制添加把这些目录上传。
+不要把运行时、数据、日志、下载缓存、验证截图、打包产物或密钥材料强制添加到版本控制。
 
-## 已验证与限制
+仓库中的 `runtime-origin.json` 仅保留早期开发环境来源记录，不作为 v0.2.0 安装依据，也不进入公开客户端 ZIP。在线安装以官方元数据为准：API 30 镜像选择官方 revision 11；旧本机镜像的 package.xml revision 11 与 source.properties revision 10 不一致，不能据此推断在线安装版本。
 
-本机已验证真实 Android 桌面、APK 安装、FMMV 主菜单和球队选择、鼠标交互、设置搜索键盘输入、横竖屏、全屏/退出、窗口缩放、冷重启后包和应用私有数据保留。不是所有应用兼容性保证，也没有完成整个游戏流程验证。
+## 安全边界与验证状态
+
+Android 镜像使用**公开 AOSP 测试证书**。向导使用匹配的公开测试密钥在本机重签名 WebView，保留 Android 签名校验，不修改业务 APK。测试密钥不是秘密，不能提供生产签名的信任边界；此镜像不适合敏感生产数据。更新 WebView 不等于更新 Android 内核或系统安全补丁。
+
+v0.2.0 已在本机 Windows 10 x64 上完成独立客户端目录的在线组件准备，确认 Android 桌面持续显示、WebView 156 生效，以及系统设置、横竖屏、全屏和最小化恢复。另已验证写入 Android 文件后立即正常关闭，再从含中文和空格的新客户端目录启动，文件仍在且运行时安装记录不变。迁移原件保留、目标数据不覆盖、取消与解压路径边界检查通过。详见 [验证记录](VALIDATION.md)。
+
+**这些结果来自现有开发电脑，不等于干净 Windows 机器验收；独立 Windows 用户/虚拟机首次安装和不同硬件仍待验证。** 旧版的 APK 安装、FMMV 主菜单和球队选择、鼠标/键盘测试属于历史记录，不保证所有应用兼容或完整游戏流程。
 
 不含 Google Play 服务，不提供 ARM 原生指令翻译、游戏键位映射、多开或真实 SIM 通信。Android 11 不能安装最低版本要求高于 API 30 的应用。银行、DRM、反作弊和仅支持 ARM 的应用可能拒绝运行。客户端没有广告或推广逻辑，但不会去除第三方应用自己的广告；Android 和应用仍可能访问网络。
 
-EXE 尚未取得 Windows Authenticode 商业签名，Windows 可能显示未知发布者/SmartScreen 提示。不要关闭系统防护；核对官方仓库与发布校验值后再自行决定是否运行。仅在本机 Windows 环境实际验证，尚未覆盖所有 Windows 版本和显卡。
+EXE 尚未取得 Windows Authenticode 签名，Windows 可能提示未知发布者/SmartScreen。不要关闭防护；核对官方仓库与发布校验值后自行决定。校验值帮助发现损坏，不替代可信发布者签名。尚未覆盖所有 Windows 版本和显卡。
 
-## 开源与第三方许可
+## 许可
 
-DroidNest 自有代码采用 [MIT](LICENSE)。第三方组件保持各自许可，详情见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。公开 Release 不捆绑未经确认可分发的 Android 运行时。`runtime-origin.json` 记录组件来源和校验摘要，不是分发授权。
+DroidNest 自有代码采用 [MIT](LICENSE)。第三方组件保持各自许可，详见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。向导的来源、摘要与许可证提示不授予再分发权；公开 Release 不捆绑未经确认可分发的 Android 运行时。

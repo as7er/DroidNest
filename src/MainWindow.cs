@@ -134,7 +134,7 @@ namespace DroidNest
             status.TextWrapping = TextWrapping.Wrap;
             status.Margin = new Thickness(0, 5, 0, 5);
             AutomationProperties.SetAutomationId(status, "status");
-            AutomationProperties.SetName(status, "手机状态");
+            AutomationProperties.SetName(status, status.Text);
             AutomationProperties.SetLiveSetting(status, AutomationLiveSetting.Polite);
             stateContent.Children.Add(status);
             detail = Label("正在准备本地 Android 运行环境…", 13, secondary, FontWeights.Normal);
@@ -234,7 +234,7 @@ namespace DroidNest
             PreviewDrop += OnDrop;
             PreviewKeyDown += OnPreviewKeyDown;
             Closing += OnClosing;
-            Loaded += async delegate { await RunCommandAsync("检查环境", PhoneState.Checking, CheckRuntimeAsync); };
+            Loaded += async delegate { await RunCommandAsync("启动手机", PhoneState.Booting, StartPhoneAsync); };
             UpdateControls();
         }
 
@@ -580,6 +580,7 @@ namespace DroidNest
         private void SetStatus(string title, string message)
         {
             status.Text = title;
+            AutomationProperties.SetName(status, title);
             detail.Text = message;
             detail.ToolTip = message;
         }

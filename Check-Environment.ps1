@@ -2,6 +2,8 @@
 param([switch]$Launch, [switch]$Json)
 
 $ErrorActionPreference = 'Stop'
+$appRoot = $PSScriptRoot
+$stateRoot = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)) 'DroidNest'
 $checks = New-Object 'System.Collections.Generic.List[object]'
 function Add-Check([string]$Name, [string]$Status, [string]$Message) {
     $checks.Add([pscustomobject]@{ name = $Name; status = $Status; message = $Message })
@@ -77,7 +79,7 @@ namespace DroidNestPreflight {
     } else { Add-Check 'architecture' 'fail' '需要 Intel/AMD x64 主机；不支持 ARM/ARM64，即使可以模拟运行 x64 程序。' }
 } catch { Add-Check 'host' 'fail' ('无法确认主机系统和架构：' + $_.Exception.Message) }
 
-# Do not stop after a missing CLR: report missing runtime components in the same run.
+# The launcher needs only host/CLR and application files; installation is owned by the UI.
 try {
     $registry = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine, [Microsoft.Win32.RegistryView]::Registry64)
     try {
@@ -89,16 +91,33 @@ try {
     else { Add-Check 'dotnet' 'fail' '缺少 .NET Framework 4.8。请从 Microsoft 安装 .NET Framework 4.8，重启后再次运行此检查。' }
 } catch { Add-Check 'dotnet' 'fail' ('无法读取 .NET Framework Release 注册表值：' + $_.Exception.Message) }
 
-foreach ($relative in @('', 'data', 'data\android-home', 'data\avd', 'data\avd\DroidNest.avd', 'logs')) {
-    $directory = $PSScriptRoot
-    if ($relative) { $directory = Join-Path $PSScriptRoot $relative }
+foreach ($relative in @('DroidNest.exe', 'DroidNest.exe.config', 'tools\SignWebView.java')) {
+    try {
+        $file = Get-Item -LiteralPath (Join-Path $appRoot $relative) -ErrorAction Stop
+        if ($file.PSIsContainer -or $file.Length -eq 0) { throw '不是有效的非空文件。' }
+        Add-Check ('app:' + $relative) 'pass' ('客户端文件存在：' + $relative)
+    } catch { Add-Check ('app:' + $relative) 'fail' ('客户端文件缺失或为空：' + $relative + '。请重新完整解压 v0.2.0 客户端 ZIP，不要只下载 EXE。') }
+}
+
+if (-not $Launch) {
+Add-Check 'state-root' 'pass' ('运行时、手机数据和日志的持久目录：' + $stateRoot)
+$probeDirectories = @('')
+# Never create phone directories before consent-driven legacy migration.
+if (Test-Path -LiteralPath (Join-Path $stateRoot 'runtime\installation.json') -PathType Leaf) {
+    foreach ($relative in @('data', 'data\android-home', 'data\avd', 'data\avd\DroidNest.avd', 'logs')) {
+        if (Test-Path -LiteralPath (Join-Path $stateRoot $relative) -PathType Container) { $probeDirectories += $relative }
+    }
+}
+foreach ($relative in $probeDirectories) {
+    $directory = $stateRoot
+    if ($relative) { $directory = Join-Path $stateRoot $relative }
     try {
         [IO.Directory]::CreateDirectory($directory) | Out-Null
         $probe = Join-Path $directory ('.droidnest-write-' + [Guid]::NewGuid().ToString('N') + '.tmp')
         $stream = New-Object IO.FileStream($probe, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None, 1, [IO.FileOptions]::DeleteOnClose)
         try { $stream.WriteByte(0) } finally { $stream.Dispose() }
         Add-Check ('write:' + $relative) 'pass' ('可写入：' + $directory)
-    } catch { Add-Check ('write:' + $relative) 'fail' ('目录不可写，请把完整目录移到当前用户可写的位置，不要通过自动提权解决：' + $directory + '；' + $_.Exception.Message) }
+    } catch { Add-Check ('write:' + $relative) 'fail' ('持久目录不可写，请检查当前用户权限，不要通过自动提权解决：' + $directory + '；' + $_.Exception.Message) }
     try {
         [uint64]$available = 0; [uint64]$total = 0; [uint64]$free = 0
         if (-not [DroidNestPreflight.Native]::GetDiskFreeSpaceEx($directory, [ref]$available, [ref]$total, [ref]$free)) { throw (New-Object ComponentModel.Win32Exception) }
@@ -117,7 +136,6 @@ try {
 } catch { Add-Check 'memory' 'warn' ('无法读取主机内存，不阻止启动：' + $_.Exception.Message) }
 
 $required = @(
-    'DroidNest.exe', 'DroidNest.exe.config',
     'runtime\sdk\emulator\emulator.exe',
     'runtime\sdk\emulator\qemu\windows-x86_64\qemu-system-x86_64.exe',
     'runtime\sdk\platform-tools\adb.exe', 'runtime\sdk\platform-tools\AdbWinApi.dll', 'runtime\sdk\platform-tools\AdbWinUsbApi.dll',
@@ -131,10 +149,10 @@ foreach ($file in @('scrcpy.exe', 'scrcpy-server', 'SDL3.dll', 'avcodec-63.dll',
 }
 foreach ($relative in $required) {
     try {
-        $file = Get-Item -LiteralPath (Join-Path $PSScriptRoot $relative) -ErrorAction Stop
+        $file = Get-Item -LiteralPath (Join-Path $stateRoot $relative) -ErrorAction Stop
         if ($file.PSIsContainer -or $file.Length -eq 0) { throw '不是有效的非空文件。' }
         Add-Check ('file:' + $relative) 'pass' ('文件存在：' + $relative)
-    } catch { Add-Check ('file:' + $relative) 'fail' ('缺失或为空：' + $relative + '。请按 README.md 使用 Import-LocalRuntime.ps1 导入自己的 SDK，并运行 Setup-Components.ps1 准备 scrcpy 和本地签名 WebView；客户端压缩包不包含运行时。') }
+    } catch { Add-Check ('file:' + $relative) 'fail' ('缺失或为空：' + $relative + '。双击 Start-DroidNest.cmd 进入图形安装向导，阅读来源与条款并明确同意后自动下载；不需要手动安装 SDK/JDK。') }
 }
 
 try {
@@ -144,18 +162,18 @@ try {
     Add-Check 'whpx' 'pass' 'Windows Hypervisor Platform 检测到活动的虚拟机监控程序。'
 } catch { Add-Check 'whpx' 'fail' ('WHPX 不可用。请在固件中启用 Intel VT-x/AMD-V，在“启用或关闭 Windows 功能”中启用“Windows 虚拟机监控程序平台”，重启 Windows，并确保未禁用 hypervisorlaunchtype。本工具不会自动提权或修改系统功能。详情：' + $_.Exception.Message) }
 
-$emulator = Join-Path $PSScriptRoot 'runtime\sdk\emulator\emulator.exe'
+$emulator = Join-Path $stateRoot 'runtime\sdk\emulator\emulator.exe'
 if (Test-Path -LiteralPath $emulator -PathType Leaf) {
     $process = $null
     try {
         $info = New-Object Diagnostics.ProcessStartInfo
-        $info.FileName = $emulator; $info.Arguments = '-accel-check'; $info.WorkingDirectory = $PSScriptRoot
+        $info.FileName = $emulator; $info.Arguments = '-accel-check'; $info.WorkingDirectory = $stateRoot
         $info.UseShellExecute = $false; $info.CreateNoWindow = $true
         $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true
-        $info.EnvironmentVariables['ANDROID_SDK_ROOT'] = Join-Path $PSScriptRoot 'runtime\sdk'
-        $info.EnvironmentVariables['ANDROID_HOME'] = Join-Path $PSScriptRoot 'runtime\sdk'
-        $info.EnvironmentVariables['ANDROID_USER_HOME'] = Join-Path $PSScriptRoot 'data\android-home'
-        $info.EnvironmentVariables['ANDROID_AVD_HOME'] = Join-Path $PSScriptRoot 'data\avd'
+        $info.EnvironmentVariables['ANDROID_SDK_ROOT'] = Join-Path $stateRoot 'runtime\sdk'
+        $info.EnvironmentVariables['ANDROID_HOME'] = Join-Path $stateRoot 'runtime\sdk'
+        $info.EnvironmentVariables['ANDROID_USER_HOME'] = Join-Path $stateRoot 'data\android-home'
+        $info.EnvironmentVariables['ANDROID_AVD_HOME'] = Join-Path $stateRoot 'data\avd'
         $process = [Diagnostics.Process]::Start($info)
         # Drain both pipes concurrently; neither exit nor inherited pipes may wait forever.
         $stdout = $process.StandardOutput.ReadToEndAsync()
@@ -173,7 +191,7 @@ if (Test-Path -LiteralPath $emulator -PathType Leaf) {
             $process.Dispose()
         }
     }
-} else { Add-Check 'acceleration' 'fail' '无法运行加速检查：缺少本地 emulator.exe。请先按 README.md 导入运行时。' }
+} else { Add-Check 'acceleration' 'fail' '无法运行加速检查：运行时尚未安装。双击 Start-DroidNest.cmd 进入安装向导。' }
 
 foreach ($port in @(5048, 5580, 5581)) {
     $listener = $null
@@ -185,6 +203,7 @@ foreach ($port in @(5048, 5580, 5581)) {
     } catch { Add-Check ('port:' + $port) 'fail' "TCP 端口 $port 已占用或被 Windows 保留。请先关闭已有 DroidNest，或自行确认占用进程并释放端口；本工具不会停止其他进程。详情：$($_.Exception.Message)" }
     finally { if ($null -ne $listener) { $listener.Stop() } }
 }
+}
 
 $ready = @($checks | Where-Object { $_.status -eq 'fail' }).Count -eq 0
 $launched = $false
@@ -195,17 +214,18 @@ if ($Launch -and $ready) {
         $info.WorkingDirectory = $PSScriptRoot; $info.UseShellExecute = $false
         $app = [Diagnostics.Process]::Start($info)
         $app.Dispose(); $launched = $true
-        Add-Check 'launch' 'pass' '已启动 DroidNest。'
+        Add-Check 'launch' 'pass' '已启动 DroidNest；缺少运行时会进入安装向导，安装前需要明确同意。'
     } catch { Add-Check 'launch' 'fail' ('无法启动 DroidNest：' + $_.Exception.Message); $ready = $false }
 }
 if ($Json) {
-    [pscustomobject]@{ ready = $ready; launched = $launched; root = $PSScriptRoot; checks = $checks.ToArray() } | ConvertTo-Json -Depth 5
+    [pscustomobject]@{ ready = $ready; launched = $launched; mode = $(if ($Launch) { 'launch' } else { 'diagnostic' }); root = $stateRoot; appRoot = $appRoot; checks = $checks.ToArray() } | ConvertTo-Json -Depth 5
 } else {
     foreach ($check in $checks) {
         $label = switch ($check.status) { 'pass' { '通过' } 'warn' { '警告' } 'fail' { '失败' } }
         Write-Output ('[{0}] {1}' -f $label, $check.message)
     }
-    if ($ready) { Write-Output '环境检查通过。' }
-    else { Write-Output '环境检查未通过，未启动 DroidNest。请解决以上失败项目；安装步骤见 README.md。不会自动下载运行时、提权或更改系统功能。' }
+    if ($ready) { Write-Output $(if ($Launch) { '客户端已启动。' } else { '环境诊断通过。' }) }
+    elseif ($Launch) { Write-Output '客户端启动条件未满足；请解决以上失败项目。缺少 Android 运行时不会阻止打开安装向导。' }
+    else { Write-Output '环境诊断未通过（诊断模式不会启动或下载）。缺少组件时请双击 Start-DroidNest.cmd 进入安装向导；虚拟化等宿主条件仍需自行启用。' }
 }
 if ($ready) { exit 0 } else { exit 1 }

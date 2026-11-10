@@ -22,10 +22,20 @@ namespace DroidNest
 
                 try
                 {
-                    string root = Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory);
+                    string appRoot = Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory);
+                    string root = AppPaths.Root;
                     Application app = new Application();
+                    app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                    if (AppPaths.HasLegacy(appRoot) || !RuntimeInstaller.IsInstalled(root))
+                    {
+                        SetupWindow setup = new SetupWindow(root, appRoot);
+                        setup.ShowDialog();
+                        if (!setup.Completed) { app.Shutdown(); return 1; }
+                    }
+                    MainWindow main = new MainWindow(root);
+                    app.MainWindow = main;
                     app.ShutdownMode = ShutdownMode.OnMainWindowClose;
-                    app.Run(new MainWindow(root));
+                    app.Run(main);
                     return 0;
                 }
                 catch (Exception ex)

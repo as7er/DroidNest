@@ -16,6 +16,12 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Xaml" />
     <Reference Include="WindowsBase" />
     <Reference Include="PresentationCore" />
@@ -26,6 +32,9 @@
     <Compile Include="src\AndroidRuntime.cs" />
     <Compile Include="src\PhoneDisplayHost.cs" />
     <Compile Include="src\AssemblyInfo.cs" />
+    <Compile Include="src\AppPaths.cs" />
+    <Compile Include="src\SetupWindow.cs" />
+    <Compile Include="src\RuntimeInstaller.cs" />
     <None Include="DroidNest.exe.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

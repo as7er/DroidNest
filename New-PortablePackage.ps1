@@ -4,10 +4,10 @@
 Creates an allowlisted client ZIP, or a private local-runtime migration ZIP.
 .DESCRIPTION
 The default Client mode contains no Android runtime, phone data, logs, or keys.
-Local mode requires the source phone to be stopped, includes only installed
-runtime components, and NEVER produces a public-release artifact. Phone data
-(including its Android identity/ADB keys) requires the explicit -IncludeData
-switch. Stop DroidNest and its emulator/display processes yourself first.
+Local mode reads installed runtime from %LOCALAPPDATA%\DroidNest, requires the
+phone to be stopped, and NEVER produces a public-release artifact. Phone data
+(including its Android identity/ADB keys) requires explicit -IncludeData.
+The extracted local package is imported by the consent-driven client migration.
 
 Outputs dist/DroidNest-v<VERSION>-win-x64-client.zip and a matching
 -SHA256SUMS.txt sidecar. Local names contain LOCAL-ONLY and optionally with-data.
@@ -15,7 +15,7 @@ ZIP entries are rooted directly at the extraction directory. Existing outputs
 are never overwritten. .NET ZipArchive streams files and supports ZIP64, unlike
 Compress-Archive's large-file limitation. No build or download is performed.
 .EXAMPLE
-.\New-PortablePackage.ps1 -Version 0.1.0
+.\New-PortablePackage.ps1 -Version 0.2.0
 .EXAMPLE
 .\New-PortablePackage.ps1 -Mode Local -IncludeData
 #>
@@ -23,7 +23,7 @@ Compress-Archive's large-file limitation. No build or download is performed.
 param(
     [ValidateLength(5, 64)]
     [ValidatePattern('^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$')]
-    [string]$Version = '0.1.0',
+    [string]$Version = '0.2.0',
 
     [ValidateSet('Client', 'Local')]
     [string]$Mode = 'Client',
@@ -39,6 +39,8 @@ if ($IncludeData -and $Mode -ne 'Local') {
 
 $sourceRoot = [IO.Path]::GetFullPath($PSScriptRoot).TrimEnd([char[]]'\/')
 $sourcePrefix = $sourceRoot + [IO.Path]::DirectorySeparatorChar
+$stateRoot = [IO.Path]::GetFullPath((Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)) 'DroidNest')).TrimEnd([char[]]'\/')
+$statePrefix = $stateRoot + [IO.Path]::DirectorySeparatorChar
 $entries = New-Object 'System.Collections.Generic.List[object]'
 
 function Assert-NotReparsePoint {
@@ -57,16 +59,20 @@ while ($null -ne $ancestor) {
 
 function Get-SafeSourceItem {
     param([string]$RelativePath)
-    $path = [IO.Path]::GetFullPath((Join-Path $sourceRoot $RelativePath))
-    if (-not $path.StartsWith($sourcePrefix, [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Source path escapes the project: $RelativePath"
+    $root = $sourceRoot
+    if ($RelativePath -match '^(runtime|data)([\\/]|$)') { $root = $stateRoot }
+    $prefix = $root + [IO.Path]::DirectorySeparatorChar
+    $path = [IO.Path]::GetFullPath((Join-Path $root $RelativePath))
+    if (-not $path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Source path escapes its allowed root: $RelativePath"
     }
     $item = Get-Item -LiteralPath $path -Force
     Assert-NotReparsePoint $item
-    $parentPath = [IO.Path]::GetDirectoryName($path)
-    while ($parentPath.Length -gt $sourceRoot.Length) {
-        Assert-NotReparsePoint (Get-Item -LiteralPath $parentPath -Force)
-        $parentPath = [IO.Path]::GetDirectoryName($parentPath)
+    if ($item.PSIsContainer) { $ancestor = $item.Parent }
+    else { $ancestor = $item.Directory }
+    while ($null -ne $ancestor) {
+        Assert-NotReparsePoint $ancestor
+        $ancestor = $ancestor.Parent
     }
     return $item
 }
@@ -85,15 +91,17 @@ function Add-PackageTree {
     foreach ($item in Get-ChildItem -LiteralPath $directory.FullName -Force) {
         Assert-NotReparsePoint $item
         # These directories are never part of a migration, even if nested.
-        if ($item.Name -in @('.git', 'verification', 'logs')) { continue }
+        if ($item.Name -in @('.git', 'verification', 'logs', 'cache', 'tools', 'keys', 'staging', '.staging')) { continue }
         $child = Join-Path $RelativePath $item.Name
         if ($item.PSIsContainer) {
             Add-PackageTree $child $RuntimeOnly
         } else {
             if ($RuntimeOnly -and ($item.Name -match '(?i)^(testkey\.|adbkey($|\.)|webview\.apk$)' -or
-                $item.Extension -match '(?i)^\.(pk8|key|pfx|p12|jks|keystore|zip|7z|rar|tar|tgz|gz|bz2|xz|apk)$')) {
+                $item.Extension -match '(?i)^\.(pk8|key|pfx|p12|jks|keystore|zip|7z|rar|tar|tgz|gz|bz2|xz)$')) {
                 continue
             }
+            # Emulator resources include required overlay APKs recorded in installation.json.
+            # These allowlisted runtime trees must remain intact for import validation.
             Add-PackageFile $child
         }
     }
@@ -135,18 +143,20 @@ function Assert-SourceStopped {
         throw "Cannot check running processes safely. Local packaging is refused. $($_.Exception.Message)"
     }
     foreach ($process in $processes) {
-        if ($process.Name -notmatch '(?i)^(DroidNest.*|qemu.*|scrcpy.*|emulator)\.exe$') { continue }
+        if ($process.Name -notmatch '(?i)^(DroidNest.*|qemu.*|scrcpy.*|emulator|adb)\.exe$') { continue }
         $commandLine = [string]$process.CommandLine
         $executable = [string]$process.ExecutablePath
         if ([string]::IsNullOrWhiteSpace($commandLine) -and [string]::IsNullOrWhiteSpace($executable)) {
             throw "Cannot inspect $($process.Name) (PID $($process.ProcessId)); stop it or retry with permission to inspect it."
         }
         $reference = ($executable + ' ' + $commandLine).Replace('/', '\')
-        if ($reference.IndexOf($sourcePrefix.Replace('/', '\'), [StringComparison]::OrdinalIgnoreCase) -ge 0) {
-            throw "Local packaging requires a stopped phone: $($process.Name) (PID $($process.ProcessId)) references $sourceRoot."
+        if ($reference.IndexOf($sourcePrefix.Replace('/', '\'), [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+            $reference.IndexOf($statePrefix.Replace('/', '\'), [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+            $process.Name -match '(?i)^DroidNest.*\.exe$') {
+            throw "Local packaging requires a stopped phone and client: $($process.Name) (PID $($process.ProcessId))."
         }
     }
-    if ($IncludeData -and (Test-Path -LiteralPath (Join-Path $sourceRoot 'data\avd'))) {
+    if ($IncludeData -and (Test-Path -LiteralPath (Join-Path $stateRoot 'data\avd'))) {
         Assert-AvdUnlocked 'data\avd'
     }
 }
@@ -156,14 +166,13 @@ $clientFiles = @(
     'DroidNest.exe.config',
     'Start-DroidNest.cmd',
     'Check-Environment.ps1',
-    'Import-LocalRuntime.ps1',
-    'Setup-Components.ps1',
     'New-PortablePackage.ps1',
     'tools\SignWebView.java',
     'README.md',
     'LICENSE',
     'THIRD-PARTY-NOTICES.md',
-    'runtime-origin.json'
+    'RELEASE-NOTES.md'
+    'VALIDATION.md'
 )
 foreach ($relative in $clientFiles) { Add-PackageFile $relative }
 if (Test-Path -LiteralPath (Join-Path $sourceRoot 'CHANGELOG.md')) {
@@ -195,6 +204,12 @@ if ($Mode -eq 'Local') {
         Add-PackageTree $relative $true
     }
     Add-PackageFile 'runtime\webview-local.apk'
+    if (Test-Path -LiteralPath (Join-Path $stateRoot 'runtime\installation.json')) {
+        Add-PackageFile 'runtime\installation.json'
+    }
+    foreach ($record in @('runtime\installation-licenses.txt', 'runtime\installation-plan.txt')) {
+        if (Test-Path -LiteralPath (Join-Path $stateRoot $record)) { Add-PackageFile $record }
+    }
     if ($IncludeData) {
         Write-Warning 'PRIVATE PHONE DATA INCLUDED: Installed apps, credentials, Android identity, and ADB keys may be present. Keep this archive private.'
         Add-PackageTree 'data' $false
@@ -271,6 +286,11 @@ try {
     if ($Mode -eq 'Local') { Write-Warning 'LOCAL-ONLY archive created. Do not attach it to GitHub Releases or share it publicly.' }
 } finally {
     if ($ownsStaging -and (Test-Path -LiteralPath $staging)) {
-        Remove-Item -LiteralPath $staging -Recurse -Force
+        $cleanupTarget = [IO.Path]::GetFullPath($staging)
+        $distPrefix = [IO.Path]::GetFullPath($dist).TrimEnd([char[]]'\/') + [IO.Path]::DirectorySeparatorChar
+        if (-not $cleanupTarget.StartsWith($distPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Packaging cleanup target escapes dist.'
+        }
+        Remove-Item -LiteralPath $cleanupTarget -Recurse -Force
     }
 }

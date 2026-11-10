@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.0 — 引导式在线安装
+
+- 新用户完整解压客户端 ZIP 后启动图形安装向导，无需手动 SDK/JDK 或 PowerShell 组件安装步骤。先读取元数据并展示来源、版本、实际下载大小及条款，明确同意后才安装。
+- 自动准备 Android Emulator、Platform Tools、API 30 default x86_64 镜像、scrcpy 5.0.1 与 WebView 156.0.8078.47；私有 Temurin JDK 21.0.13+9 和 Build Tools 35.0.0 用于本地公开 AOSP 测试密钥重签名，保留 Android 签名校验。
+- 安装向导在读取元数据前检查宿主条件，WHPX 缺失时提供 Windows 功能入口；条件修复前不下载组件。安装完成或再次打开主界面后自动启动已准备的手机。
+- 运行时、手机数据及日志使用 %LOCALAPPDATA%/DroidNest，客户端更新与手机数据分离；旧版相邻目录通过明确同意复制，仅导入持久目录尚不存在的对应文件夹并保留原件。安装取消/失败重试不要求删除手机数据。
+- Start-DroidNest.cmd / Check-Environment.ps1 -Launch 只检查客户端启动前提，不再因缺少运行时或尚未开启 WHPX 阻止进入向导；默认/JSON 模式保留完整诊断，并区分 appRoot 与持久 root。
+- v0.2.0 公开打包继续使用文件白名单，包含 tools/SignWebView.java 和发布说明，不包含第三方运行时、私有准备工具、缓存、数据、日志或密钥；删除旧的 Setup-Components.ps1 和 Import-LocalRuntime.ps1 手动入口。
+- LOCAL-ONLY 私人迁移从持久目录读取已安装运行时并保留 installation.json；仍需停止实例，默认不含数据，显式 IncludeData 才包含敏感手机内容。
+- README、发布说明和第三方许可说明更新在线同意、网络重试、宿主虚拟化、数据保留及签名风险边界。公开包不构成第三方再分发授权，EXE 仍未作 Authenticode 签名。
+- 修复 scrcpy 首帧到达前嵌入窗口引发的除零崩溃；窗口最小化或布局临时归零时保留视频尺寸，辅助功能状态同步实际手机状态。
+- 停止手机前刷新 Android 文件系统，修复刚写入数据后立即关闭可能丢失文件的问题。
+- 私人迁移包保留模拟器自带 overlay APK，避免安装记录校验时误判文件缺失。
+- 验证状态：本机在线组件准备、持续桌面显示、窗口操作、换目录启动和立即关闭后的数据保留已通过；迁移与解压边界检查通过。独立干净 Windows 环境仍待验收，详情见 VALIDATION.md。
+
 ## 0.1.0 — 客户端开源发布
 
 - 自有客户端代码采用 MIT，公开仓库 as7er/DroidNest；Release 只包含客户端与工具，不包含 Android 运行时、WebView APK 或手机数据。

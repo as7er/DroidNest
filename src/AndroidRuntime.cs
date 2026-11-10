@@ -202,7 +202,7 @@ namespace DroidNest
             int major;
             if (version.Success && Int32.TryParse(version.Groups[1].Value, out major) && major >= 156) return;
             string apk = Path.Combine(root, "runtime", "webview-local.apk");
-            if (!File.Exists(apk)) throw new FileNotFoundException("需要新版 WebView。请先运行 Setup-Components.ps1 准备开发镜像组件。", apk);
+            if (!File.Exists(apk)) throw new FileNotFoundException("缺少新版 WebView。请关闭并重新打开 DroidNest，进入组件安装向导修复。", apk);
             Emit("正在升级 Android WebView，保留应用和手机数据…");
             CommandResult installed = await RunAdbAsync(new string[] { "install", "-r", apk }, 180000, token).ConfigureAwait(false);
             EnsureSuccess(installed, "WebView upgrade failed");
@@ -218,7 +218,7 @@ namespace DroidNest
         private async Task StartDisplayAsync(CancellationToken token)
         {
             string path = Path.Combine(root, "runtime", "scrcpy-win64-v5.0.1", "scrcpy.exe");
-            if (!File.Exists(path)) throw new FileNotFoundException("缺少 scrcpy 视频组件，请运行 Setup-Components.ps1。", path);
+            if (!File.Exists(path)) throw new FileNotFoundException("缺少 scrcpy 视频组件。请关闭并重新打开 DroidNest，进入组件安装向导修复。", path);
             OwnedProcess video = Launch(path, new string[] {
                 "--serial=" + Serial, "--window-title=DroidNest.Display", "--window-borderless",
                 "--no-window-aspect-ratio-lock", "--window-x=-16000", "--window-y=-16000",
@@ -235,7 +235,10 @@ namespace DroidNest
                 Native.EnumWindows(delegate(IntPtr window, IntPtr unused) {
                     uint owner;
                     Native.GetWindowThreadProcessId(window, out owner);
-                    if (owner == video.ProcessId)
+                    // scrcpy creates a hidden HWND before receiving its first frame.
+                    // Reparenting/showing it early can render with zero content dimensions.
+                    // Its own first-frame handler makes the off-screen window visible.
+                    if (owner == video.ProcessId && Native.IsWindowVisible(window))
                     {
                         StringBuilder title = new StringBuilder(128);
                         Native.GetWindowText(window, title, title.Capacity);
@@ -335,7 +338,7 @@ namespace DroidNest
             finally { operations.Release(); }
         }
 
-        private bool CheckHost(StringBuilder report)
+        private bool CheckHost(StringBuilder report, bool installation = false)
         {
             bool usable = true;
             try
@@ -375,8 +378,9 @@ namespace DroidNest
                 report.AppendLine("无法确认受支持的主机系统和架构：" + ex.Message);
                 usable = false;
             }
-            foreach (string directory in new string[] { root, DataDirectory, androidHome, avdHome,
-                Path.Combine(avdHome, "DroidNest.avd"), logsDirectory })
+            string[] directories = installation ? new string[] { root } : new string[] { root, DataDirectory, androidHome, avdHome,
+                Path.Combine(avdHome, "DroidNest.avd"), logsDirectory };
+            foreach (string directory in directories)
             {
                 try
                 {
@@ -415,6 +419,21 @@ namespace DroidNest
             else if (memory.TotalPhysical < 8UL * 1024 * 1024 * 1024)
                 report.AppendLine("警告：主机内存不足 8 GiB，运行可能较慢；此建议不阻止启动。");
             return usable;
+        }
+
+        internal Task<string> CheckInstallationHostAsync(CancellationToken token)
+        {
+            return Task.Run(delegate
+            {
+                token.ThrowIfCancellationRequested();
+                StringBuilder report = new StringBuilder();
+                bool usable = CheckHost(report, true);
+                string whpx;
+                if (!CheckWhpx(out whpx)) usable = false;
+                report.AppendLine(whpx);
+                if (!usable) throw new InvalidOperationException(report.ToString());
+                return report.ToString();
+            }, token);
         }
 
         private async Task<Preflight> CheckCoreAsync(CancellationToken token)
@@ -456,7 +475,7 @@ namespace DroidNest
                 usable = false;
             }
             if (filesPresent) report.AppendLine("本地模拟器、platform-tools、Android 11 x86_64 镜像、scrcpy 和本地签名 WebView 文件齐全。");
-            else report.AppendLine("客户端不附带运行时。请按 README.md 使用 Import-LocalRuntime.ps1 导入自己的完整 SDK，并运行 Setup-Components.ps1 准备 scrcpy 与本地签名 WebView。本工具不会自动下载组件。");
+            else report.AppendLine("请关闭并重新打开 DroidNest，使用首次安装向导下载或修复组件；手机数据将保留。");
 
             string whpx;
             bool hypervisor = CheckWhpx(out whpx);
@@ -654,6 +673,15 @@ namespace DroidNest
                 {
                     if (server != null && !server.HasExited)
                     {
+                        try
+                        {
+                            // emu kill stops the VM without an Android shutdown. Flush guest
+                            // filesystem writes first so a just-written app file survives.
+                            CommandResult synced = await RunAdbAsync(new string[] { "shell", "sync" }, 15000,
+                                CancellationToken.None).ConfigureAwait(false);
+                            if (synced.ExitCode != 0) Emit("Flushing Android storage: " + synced.Details);
+                        }
+                        catch (Exception ex) { Emit("Flushing Android storage unavailable: " + ex.Message); }
                         try
                         {
                             CommandResult result = await RunAdbAsync(new string[] { "emu", "kill" }, 4000,
@@ -1132,6 +1160,7 @@ namespace DroidNest
             internal delegate bool EnumWindowsCallback(IntPtr window, IntPtr parameter);
             [DllImport("user32.dll")] internal static extern bool EnumWindows(EnumWindowsCallback callback, IntPtr parameter);
             [DllImport("user32.dll")] internal static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+            [DllImport("user32.dll")] internal static extern bool IsWindowVisible(IntPtr window);
             [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern int GetWindowText(IntPtr window, StringBuilder text, int count);
             [DllImport("user32.dll")] internal static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
             [StructLayout(LayoutKind.Sequential)]

@@ -229,6 +229,10 @@ namespace DroidNest
             NativeRect bounds;
             if (!GetClientRect(container, out bounds))
                 throw new Win32Exception(Marshal.GetLastWin32Error(), "Cannot measure the phone display container.");
+            // Layout/minimize transitions may temporarily have no drawable area.
+            // Keep the last video size until a positive client rectangle is available.
+            if (bounds.Right <= bounds.Left || bounds.Bottom <= bounds.Top)
+                return;
             NativeRect actual;
             if (flags == 0 && GetClientRect(window, out actual) &&
                 actual.Right - actual.Left == bounds.Right - bounds.Left &&
