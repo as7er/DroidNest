@@ -1,0 +1,21 @@
+{
+  "purpose": "Local development runtime, not a redistribution license",
+  "source": "Locally installed Android SDK",
+  "components": ["emulator", "platform-tools", "system-images;android-30;default;x86_64"],
+  "androidApiLevel": 30,
+  "imageRevision": 10,
+  "googlePlayIncluded": false,
+  "scrcpy": {
+    "version": "5.0.1",
+    "source": "https://github.com/Genymobile/scrcpy/releases/tag/v5.0.1",
+    "archiveSha256": "b12a2c4ee8be317422451fc7dcf8ee20a71b5ea7ef9ad73ddd825a25316227a5"
+  },
+  "webview": {
+    "version": "156.0.8078.47",
+    "source": "https://github.com/LineageOS/android_external_chromium-webview_prebuilt_x86_64/tree/a71893ba05acc77405e46262d458b47ab2b11e54",
+    "upstreamSha256": "a98312a1427ca5c029e30009cc4a002e90affe9370e42b7f93a88ee6425c1278",
+    "localApkSha256": "4762fd6cb1b7235e0bcc1deac007bec8653f3f22c5340df02dd532d35f2004af",
+    "signing": "Re-signed using the PUBLIC AOSP test key matching the development image. Never use for production."
+  },
+  "distributionStatus": "Not cleared for public redistribution. Review each component license and obtain or build distributable artifacts before publishing."
+}
