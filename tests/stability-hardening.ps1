@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -102,6 +102,12 @@ try {
     foreach ($expected in @('hw.ramSize=2048', 'hw.cpu.ncore=2', 'hw.lcd.width=720', 'hw.lcd.height=1280',
             'hw.lcd.density=320', 'vm.heapSize=256', 'disk.dataPartition.size=4G', 'hw.gpu.mode=swiftshader')) {
         if (-not $invalid.Contains($expected)) { throw ('AVD merge accepted invalid ' + $expected) }
+    }
+    # The emulator rewrites the file with spaces and expands 8G into bytes; both must survive.
+    $rewritten = [string]$merge.Invoke($null, @([string]"hw.ramSize = 3072`nhw.cpu.ncore = 4`nhw.lcd.width = 540`nhw.lcd.height = 960`n disk.dataPartition.size = 6442450944`n", 'C:\image'))
+    foreach ($expected in @('hw.ramSize=3072', 'hw.cpu.ncore=4', 'hw.lcd.width=540', 'skin.name=540x960',
+            'disk.dataPartition.size=6442450944')) {
+        if (-not $rewritten.Contains($expected)) { throw ('AVD merge lost emulator-rewritten ' + $expected) }
     }
 
     # The real PrepareAvd path writes defaults, then carries an edited config.ini into the next start.

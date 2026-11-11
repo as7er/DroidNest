@@ -56,6 +56,11 @@ namespace DroidNest
             get { return GetAttachedWindow() != IntPtr.Zero; }
         }
 
+        public IntPtr AttachedHandle
+        {
+            get { return GetAttachedWindow(); }
+        }
+
         public void Attach(IntPtr displayWindow)
         {
             VerifyAccess();

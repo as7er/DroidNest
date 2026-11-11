@@ -15,6 +15,7 @@ namespace DroidNest
     {
         private readonly string root, appRoot;
         private readonly RuntimeInstaller installer;
+        private readonly bool repair;
         private readonly TextBox information;
         private readonly TextBlock status;
         private readonly CheckBox consent;
@@ -25,11 +26,12 @@ namespace DroidNest
         private bool busy, closing, accepted, migration;
         internal bool Completed { get; private set; }
 
-        internal SetupWindow(string root, string appRoot)
+        internal SetupWindow(string root, string appRoot, bool repair = false)
         {
             this.root = root; this.appRoot = appRoot;
+            this.repair = repair;
             installer = new RuntimeInstaller(root, appRoot);
-            Title = "DroidNest / 安卓小窝 · 首次安装";
+            Title = "DroidNest / 安卓小窝 · " + (repair ? "修复运行环境" : "首次安装");
             Width = 820; Height = 720; MinWidth = 640; MinHeight = 520;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
             FontFamily = new FontFamily("Segoe UI, Microsoft YaHei UI"); FontSize = 14;
@@ -108,7 +110,7 @@ namespace DroidNest
                     consent.Content = "同意复制旧运行环境及手机数据到固定用户目录（不删除原文件）。";
                     action.Content = "保留数据并继续";
                 }
-                else if (RuntimeInstaller.IsInstalled(root))
+                else if (!repair && RuntimeInstaller.IsInstalled(root))
                 {
                     status.Text = "检查已安装组件与模拟器加速…";
                     using (AndroidRuntime runtime = new AndroidRuntime(root)) await runtime.CheckAsync();

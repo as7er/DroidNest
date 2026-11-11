@@ -81,11 +81,20 @@ namespace DroidNest
             string text;
             if (!values.TryGetValue(key, out text)) return "4G";
             Match match = Regex.Match(text, @"^([0-9]{1,5})([MG])$", RegexOptions.IgnoreCase);
-            if (!match.Success) return "4G";
-            long amount = Int64.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
-            long bytes = match.Groups[2].Value.Equals("G", StringComparison.OrdinalIgnoreCase) ? amount << 30 : amount << 20;
-            if (bytes < (512L << 20) || bytes > (64L << 30)) return "4G";
-            return amount.ToString(CultureInfo.InvariantCulture) + match.Groups[2].Value.ToUpperInvariant();
+            long bytes;
+            if (match.Success)
+            {
+                long amount = Int64.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
+                bytes = match.Groups[2].Value.Equals("G", StringComparison.OrdinalIgnoreCase) ? amount << 30 : amount << 20;
+                if (bytes < (512L << 20) || bytes > (64L << 30)) return "4G";
+                return amount.ToString(CultureInfo.InvariantCulture) + match.Groups[2].Value.ToUpperInvariant();
+            }
+            // The emulator rewrites 4G/8G as a byte count; keep that value instead of resetting it.
+            if (Regex.IsMatch(text, @"^[0-9]{1,12}$") &&
+                Int64.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out bytes) &&
+                bytes >= (512L << 20) && bytes <= (64L << 30))
+                return text;
+            return "4G";
         }
 
         private static string ReadGpu(IDictionary<string, string> values)

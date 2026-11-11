@@ -55,9 +55,13 @@
 
 - 点击手机画面模拟触摸，鼠标拖动滑动页面，键盘输入文字。
 - 右侧按钮：主页、返回、最近任务、旋转、系统设置、安装 APK。
+- 安装 APK 前会显示包名、版本和签名证书 SHA-256；只有确认后才安装。缺 Build Tools/JDK 或签名格式不受支持时会明确提示，由你决定是否继续。
 - APK 拖放使用右侧面板；不支持把 XAPK/APKS 压缩包当成单个 APK 安装。
+- “备份手机数据…”在手机停止后可生成含 `data` 的 ZIP 和同目录 SHA-256 文件；“恢复手机数据…”先校验同名校验文件，只解压到空的 `data`，不覆盖、不合并现有手机数据。
+- “打开客户端时自动启动手机”可关闭；设置保存在客户端的 `settings.json`，与手机数据分开。
 - F11 切换整个窗口全屏，Esc 退出全屏，手机获得焦点时也有效。
 - 窗口缩放和旋转保持画面比例，黑边不是触摸区域。
+- 手机画面进程异常退出时自动重连并继续运行 Android；模拟器或私有 ADB 退出时状态区显示原因和日志路径，可点击“启动手机”重启。
 - 在 Android 应用抽屉打开应用，在 Android 设置中卸载。
 - 默认不自动同步 Windows 与 Android 剪贴板。视频限制 30 FPS / 4 Mbps，声音由 Android 引擎输出，不重复转发。
 
@@ -79,7 +83,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\New-PortablePackage.ps1 -Version 0.2.0
 ```
 
-`dist/` 产物采用客户端文件白名单，包含 EXE、配置、启动与诊断脚本、`tools/SignWebView.java`、许可和说明；**不包含运行时、私有准备工具、下载缓存、手机数据、日志或密钥**。附带 SHA-256 校验文件，拒绝覆盖同名产物。旧版 `Setup-Components.ps1` 和 `Import-LocalRuntime.ps1` 已移除，安装由客户端完成。
+`dist/` 产物采用客户端文件白名单，包含 EXE、配置、启动与诊断脚本、`tools/SignWebView.java`、`Sign-Release.ps1`、许可和说明；**不包含运行时、私有准备工具、下载缓存、手机数据、日志或密钥**。附带 SHA-256 校验文件，拒绝覆盖同名产物。旧版 `Setup-Components.ps1` 和 `Import-LocalRuntime.ps1` 已移除，安装由客户端完成。
+
+主界面“修复运行环境…”会在保留手机数据的前提下重新准备运行时：旧运行时移动到 `runtime.previous-<id>`，不动 `data`。启动时若发现安装记录格式过旧、模拟器/Platform Tools 版本与客户端固定版本不一致，或缺少 Build Tools，会显示修复提示；修复后需重新打开客户端。
+
+发布 EXE 的 Authenticode 签名需要你自己的代码签名证书。仓库提供 `Sign-Release.ps1 -PfxPath <pfx> -PfxPassword <password>`，没有证书时脚本直接失败，不会生成自签名证书冒充发布签名。签名后仍需人工核对证书主题与时间戳；SHA-256 校验文件只证明完整性，不等于发布者签名。
 
 迁移自己的已安装环境：正常关闭全部 DroidNest，再运行：
 

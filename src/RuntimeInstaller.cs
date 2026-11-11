@@ -340,6 +340,49 @@ namespace DroidNest
                 return XDocument.Load(reader);
         }
 
+        // Cheap startup check: never re-hashes the runtime. Returns null when nothing needs attention.
+        internal static string DescribeHealth(string root)
+        {
+            string runtime = Path.Combine(root, "runtime");
+            if (!Directory.Exists(runtime)) return "运行时尚未安装。";
+            string receipt = Path.Combine(runtime, "installation.json");
+            if (!File.Exists(receipt)) return "运行时缺少安装记录；可进入安装向导修复，手机数据保留。";
+            try
+            {
+                var document = JsonObject(File.ReadAllText(receipt));
+                int format = Convert.ToInt32(document["format"], CultureInfo.InvariantCulture);
+                if (format != 2) return "安装记录格式为 " + format + "，需要重新准备运行时；手机数据保留。";
+            }
+            catch (Exception ex)
+            {
+                if (!(ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException ||
+                    ex is InvalidOperationException || ex is KeyNotFoundException || ex is InvalidCastException ||
+                    ex is FormatException || ex is OverflowException)) throw;
+                return "安装记录损坏，需要重新准备运行时；手机数据保留。";
+            }
+            string emulator = ReadRevision(Path.Combine(runtime, "sdk", "emulator", "source.properties"));
+            if (emulator != null && emulator != "37.2.13")
+                return "模拟器版本 " + emulator + " 与客户端固定的 37.2.13 不一致，建议修复运行时。";
+            string platformTools = ReadRevision(Path.Combine(runtime, "sdk", "platform-tools", "source.properties"));
+            if (platformTools != null && platformTools != "37.0.1")
+                return "Platform Tools 版本 " + platformTools + " 与客户端固定的 37.0.1 不一致，建议修复运行时。";
+            if (!File.Exists(Path.Combine(runtime, "tools", "build-tools", "aapt2.exe")))
+                return "缺少 Build Tools，无法在安装前读取 APK 信息；可在安装向导修复。";
+            return null;
+        }
+
+        private static string ReadRevision(string propertiesPath)
+        {
+            if (!File.Exists(propertiesPath)) return null;
+            foreach (string line in File.ReadAllLines(propertiesPath))
+            {
+                int separator = line.IndexOf('=');
+                if (separator > 0 && line.Substring(0, separator).Trim() == "Pkg.Revision")
+                    return line.Substring(separator + 1).Trim();
+            }
+            return null;
+        }
+
         private static Dictionary<string, object> JsonObject(string text)
         {
             return new JavaScriptSerializer { MaxJsonLength = 8 * 1024 * 1024 }.Deserialize<Dictionary<string, object>>(text);
@@ -661,7 +704,7 @@ namespace DroidNest
         }
 
         // Reject Windows ADS, device names, normalization aliases, traversal and existing junctions.
-        private static string SafePath(string directory, string relative)
+        internal static string SafePath(string directory, string relative)
         {
             if (String.IsNullOrEmpty(relative) || Path.IsPathRooted(relative)) throw new InvalidDataException("Invalid relative path: " + relative);
             string[] parts = relative.Replace('\\', '/').Split('/');

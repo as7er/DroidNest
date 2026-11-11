@@ -44,6 +44,7 @@ namespace DroidNest
         private string emulatorLog;
         private string avdGpuMode = AvdConfig.DefaultGpuMode;
         private string exitReason;
+        private bool recovering;
 
         public event Action<string> Log;
 
@@ -79,6 +80,9 @@ namespace DroidNest
 
         // Set when a process of the current session exits on its own, so the UI can say what ended.
         public string LastExitReason { get { lock (stateLock) { return exitReason; } } }
+
+        // True while only the video window is being reconnected; the phone itself keeps running.
+        public bool IsRecovering { get { lock (stateLock) { return recovering; } } }
 
         public async Task<string> CheckAsync()
         {
@@ -675,19 +679,22 @@ namespace DroidNest
             throw new TimeoutException("The private ADB server did not listen on port 5048 within 10 seconds. " + server.Tail);
         }
 
-        private async Task StopCoreAsync(bool announce)
+        private async Task ReleaseDisplayAsync()
         {
-            ready = false;
             OwnedProcess video;
             IntPtr window;
             lock (stateLock) { video = display; window = displayWindow; displayWindow = IntPtr.Zero; }
-            if (video != null)
-            {
-                if (!video.HasExited && window != IntPtr.Zero) Native.PostMessage(window, 0x0010, IntPtr.Zero, IntPtr.Zero);
-                await video.WaitAsync(3000, CancellationToken.None).ConfigureAwait(false);
-                video.Dispose();
-                lock (stateLock) { if (display == video) display = null; }
-            }
+            if (video == null) return;
+            if (!video.HasExited && window != IntPtr.Zero) Native.PostMessage(window, 0x0010, IntPtr.Zero, IntPtr.Zero);
+            await video.WaitAsync(3000, CancellationToken.None).ConfigureAwait(false);
+            video.Dispose();
+            lock (stateLock) { if (display == video) display = null; }
+        }
+
+        private async Task StopCoreAsync(bool announce)
+        {
+            ready = false;
+            await ReleaseDisplayAsync().ConfigureAwait(false);
             OwnedProcess phone;
             OwnedProcess server;
             lock (stateLock) { phone = emulator; server = adbServer; }
@@ -733,6 +740,33 @@ namespace DroidNest
             if (announce && (phone != null || server != null)) Emit("Android stopped. Phone data has been kept.");
         }
 
+        private async Task<bool> TryReconnectDisplayAsync()
+        {
+            lock (stateLock) { recovering = true; }
+            try
+            {
+                await ReleaseDisplayAsync().ConfigureAwait(false);
+                for (int attempt = 0; attempt < 3; attempt++)
+                {
+                    if (lifetime.IsCancellationRequested) return false;
+                    Emit("手机画面连接已中断，正在重新连接（" + (attempt + 1).ToString(CultureInfo.InvariantCulture) + "/3）…");
+                    try
+                    {
+                        await StartDisplayAsync(lifetime.Token).ConfigureAwait(false);
+                        Emit("手机画面已重新连接；Android 未重启，应用和手机数据保持原状。");
+                        return true;
+                    }
+                    catch (OperationCanceledException) { return false; }
+                    catch (Exception ex) { Emit("重新连接手机画面失败：" + ex.Message); }
+                    try { await Task.Delay(1500, lifetime.Token).ConfigureAwait(false); }
+                    catch (OperationCanceledException) { return false; }
+                }
+                lock (stateLock) { exitReason = "手机画面多次重连失败。点击“启动手机”可重启运行环境；手机数据保留。"; }
+                return false;
+            }
+            finally { lock (stateLock) { recovering = false; } }
+        }
+
         private async void ObserveExitAsync(OwnedProcess phone, OwnedProcess server)
         {
             try
@@ -741,17 +775,28 @@ namespace DroidNest
                 {
                     await Task.Delay(1000, lifetime.Token).ConfigureAwait(false);
                     lock (stateLock) { if (emulator != phone || adbServer != server) return; }
-                    if (!phone.HasExited && !server.HasExited && display != null && !display.HasExited) continue;
+                    OwnedProcess video;
+                    lock (stateLock) { video = display; }
+                    bool phoneAlive = !phone.HasExited && !server.HasExited;
+                    if (phoneAlive && video != null && !video.HasExited) continue;
                     await operations.WaitAsync(lifetime.Token).ConfigureAwait(false);
                     try
                     {
                         lock (stateLock) { if (emulator != phone || adbServer != server) return; }
-                        string reason = phone.HasExited
-                            ? (server.HasExited ? "Android 模拟器和私有 ADB 服务已退出" : "Android 模拟器已退出（代码 " + phone.ExitCode.ToString(CultureInfo.InvariantCulture) + "）")
-                            : (server.HasExited ? "私有 ADB 服务已退出（代码 " + server.ExitCode.ToString(CultureInfo.InvariantCulture) + "）" : "手机画面进程已退出");
-                        string log = emulatorLog ?? Path.Combine(logsDirectory, "emulator-*.log");
-                        lock (stateLock) { exitReason = reason + "。日志：" + log; }
-                        Emit(reason + "。Stopping only the phone this session started; data is kept.");
+                        if (phoneAlive)
+                        {
+                            // Only the video window died: reconnecting keeps the running Android session.
+                            if (await TryReconnectDisplayAsync().ConfigureAwait(false)) continue;
+                        }
+                        else
+                        {
+                            string reason = phone.HasExited
+                                ? (server.HasExited ? "Android 模拟器和私有 ADB 服务已退出" : "Android 模拟器已退出（代码 " + phone.ExitCode.ToString(CultureInfo.InvariantCulture) + "）")
+                                : ("私有 ADB 服务已退出（代码 " + server.ExitCode.ToString(CultureInfo.InvariantCulture) + "）");
+                            string log = emulatorLog ?? Path.Combine(logsDirectory, "emulator-*.log");
+                            lock (stateLock) { exitReason = reason + "。日志：" + log; }
+                            Emit(reason + "。Stopping only the phone this session started; data is kept.");
+                        }
                         await StopCoreAsync(false).ConfigureAwait(false);
                     }
                     finally { operations.Release(); }

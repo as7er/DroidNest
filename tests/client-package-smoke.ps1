@@ -6,8 +6,8 @@ $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $workspace = Join-Path ([IO.Path]::GetTempPath()) ('DroidNest-package-' + [Guid]::NewGuid().ToString('N'))
 $client = Join-Path $workspace ('client space ' + [char]0x4e2d + [char]0x6587)
 $allowed = @('DroidNest.exe', 'DroidNest.exe.config', 'Start-DroidNest.cmd', 'Check-Environment.ps1',
-    'New-PortablePackage.ps1', 'tools/SignWebView.java', 'README.md', 'LICENSE', 'THIRD-PARTY-NOTICES.md',
-    'RELEASE-NOTES.md', 'CHANGELOG.md', 'VALIDATION.md')
+    'New-PortablePackage.ps1', 'Sign-Release.ps1', 'tools/SignWebView.java', 'README.md', 'LICENSE',
+    'THIRD-PARTY-NOTICES.md', 'RELEASE-NOTES.md', 'CHANGELOG.md', 'VALIDATION.md')
 $version = '0.0.0-ci.' + [Guid]::NewGuid().ToString('N')
 $baseName = 'DroidNest-v' + $version + '-win-x64-client'
 [IO.Directory]::CreateDirectory($client) | Out-Null

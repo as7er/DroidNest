@@ -167,6 +167,7 @@ $clientFiles = @(
     'Start-DroidNest.cmd',
     'Check-Environment.ps1',
     'New-PortablePackage.ps1',
+    'Sign-Release.ps1',
     'tools\SignWebView.java',
     'README.md',
     'LICENSE',

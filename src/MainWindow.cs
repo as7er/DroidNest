@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Automation;
@@ -20,6 +21,8 @@ namespace DroidNest
         private enum PhoneState { Idle, Checking, Booting, Running, Stopping, Error }
 
         private readonly AndroidRuntime runtime;
+        private readonly string root;
+        private readonly ClientSettings settings;
         private readonly Brush background = ColorBrush("#151B20");
         private readonly Brush surface = ColorBrush("#20292F");
         private readonly Brush foreground = ColorBrush("#E5ECEF");
@@ -37,6 +40,10 @@ namespace DroidNest
         private readonly Button installButton;
         private readonly Button checkButton;
         private readonly Button dataButton;
+        private readonly Button repairButton;
+        private readonly Button backupButton;
+        private readonly Button restoreButton;
+        private readonly CheckBox autoStartBox;
         private readonly PhoneDisplayHost phoneDisplay;
         private readonly TextBlock phonePlaceholder;
         private readonly Button fullscreenButton;
@@ -57,6 +64,8 @@ namespace DroidNest
 
         public MainWindow(string root)
         {
+            this.root = root;
+            settings = ClientSettings.Load(root);
             runtime = new AndroidRuntime(root);
             Title = "DroidNest / 安卓小窝";
             Width = 1200;
@@ -168,6 +177,26 @@ namespace DroidNest
             AddPhoneButton(navigation, "系统设置", "settings", delegate { return runtime.SettingsAsync(); });
             navigation.Children.Add(dataButton);
             controlContent.Children.Add(navigation);
+            TextBlock maintainTitle = Label("数据与维护", 12, secondary, FontWeights.Normal);
+            maintainTitle.Margin = new Thickness(0, 9, 0, 6);
+            controlContent.Children.Add(maintainTitle);
+            WrapPanel maintenance = new WrapPanel();
+            backupButton = MakeButton("备份手机数据…", "backup", false);
+            restoreButton = MakeButton("恢复手机数据…", "restore", false);
+            repairButton = MakeButton("修复运行环境…", "repair", false);
+            maintenance.Children.Add(backupButton);
+            maintenance.Children.Add(restoreButton);
+            maintenance.Children.Add(repairButton);
+            controlContent.Children.Add(maintenance);
+            autoStartBox = new CheckBox
+            {
+                Content = "打开客户端时自动启动手机",
+                IsChecked = settings.AutoStartPhone,
+                Foreground = secondary,
+                Margin = new Thickness(0, 9, 0, 0)
+            };
+            AutomationProperties.SetAutomationId(autoStartBox, "auto-start");
+            controlContent.Children.Add(autoStartBox);
             TextBlock dropHint = Label("直接点击手机画面使用鼠标和键盘。安装应用可选择 APK，或将一个 .apk 文件拖到右侧面板。", 12, secondary, FontWeights.Normal);
             dropHint.TextWrapping = TextWrapping.Wrap;
             dropHint.Margin = new Thickness(0, 7, 0, 0);
@@ -215,8 +244,19 @@ namespace DroidNest
             logTimer.Tick += delegate
             {
                 FlushLogs();
-                if (!commandBusy && !closeRequested && !runtimeDisposed &&
-                    (state == PhoneState.Running || phoneDisplay.IsAttached) && !runtime.IsRunning)
+                if (commandBusy || closeRequested || runtimeDisposed)
+                    return;
+                if (state == PhoneState.Running && runtime.IsRunning)
+                {
+                    IntPtr handle = runtime.DisplayWindowHandle;
+                    if (handle != IntPtr.Zero && phoneDisplay.AttachedHandle != handle)
+                    {
+                        try { phoneDisplay.Attach(handle); }
+                        catch (Exception ex) { OnRuntimeLog("重新接入手机画面失败：" + ex.Message); }
+                    }
+                    return;
+                }
+                if ((state == PhoneState.Running || phoneDisplay.IsAttached) && !runtime.IsRunning && !runtime.IsRecovering)
                 {
                     DetachPhoneDisplay();
                     state = PhoneState.Idle;
@@ -232,12 +272,52 @@ namespace DroidNest
             checkButton.Click += async delegate { await RunCommandAsync("检查环境", PhoneState.Checking, CheckRuntimeAsync); };
             installButton.Click += async delegate { await ChooseApkAsync(); };
             dataButton.Click += delegate { OpenDataDirectory(); };
+            backupButton.Click += async delegate { await BackupPhoneAsync(); };
+            restoreButton.Click += async delegate { await RestorePhoneAsync(); };
+            repairButton.Click += delegate { RepairRuntime(); };
+            autoStartBox.Checked += delegate { PersistAutoStart(true); };
+            autoStartBox.Unchecked += delegate { PersistAutoStart(false); };
             PreviewDragOver += OnDragOver;
             PreviewDrop += OnDrop;
             PreviewKeyDown += OnPreviewKeyDown;
             Closing += OnClosing;
-            Loaded += async delegate { await RunCommandAsync("启动手机", PhoneState.Booting, StartPhoneAsync); };
+            Loaded += async delegate
+            {
+                string health = RuntimeInstaller.DescribeHealth(root);
+                if (!String.IsNullOrEmpty(health))
+                {
+                    OnRuntimeLog("运行环境提示：" + health);
+                    SetStatus("运行环境需要维护", health);
+                    UpdateControls();
+                }
+                if (settings.AutoStartPhone)
+                {
+                    await RunCommandAsync("启动手机", PhoneState.Booting, StartPhoneAsync);
+                }
+                else
+                {
+                    await RunCommandAsync("检查环境", PhoneState.Checking, CheckRuntimeAsync);
+                    if (!closeRequested && !runtimeDisposed)
+                    {
+                        state = PhoneState.Idle;
+                        SetStatus(StateText(state), "已按设置跳过自动启动。点击“启动手机”开始；关闭时会保存该设置。");
+                        UpdateControls();
+                    }
+                }
+            };
             UpdateControls();
+        }
+
+        private void PersistAutoStart(bool value)
+        {
+            if (settings.AutoStartPhone == value) return;
+            settings.AutoStartPhone = value;
+            try { settings.Save(); }
+            catch (Exception ex)
+            {
+                settings.AutoStartPhone = !value;
+                OnRuntimeLog("无法保存设置：" + ex.Message);
+            }
         }
 
         private void ToggleFullscreen()
@@ -498,6 +578,8 @@ namespace DroidNest
                 SetStatus("无法安装", "请选择一个存在的 .apk 文件；不支持 APK 压缩包或文件夹。");
                 return;
             }
+            if (!await ConfirmApkAsync(path))
+                return;
             installing = true;
             try
             {
@@ -508,6 +590,127 @@ namespace DroidNest
             {
                 installing = false;
             }
+        }
+
+        private async Task<bool> ConfirmApkAsync(string path)
+        {
+            ApkInfo info;
+            try
+            {
+                info = await Task.Run(delegate { return ApkInspector.Inspect(root, path); });
+            }
+            catch (Exception ex)
+            {
+                ReportError("读取 APK 信息失败", ex);
+                return false;
+            }
+            string details = "应用包名：" + (String.IsNullOrEmpty(info.Package) ? "无法读取" : info.Package) +
+                "\n版本：" + (String.IsNullOrEmpty(info.Version) ? "无法读取" : info.Version) +
+                "\n签名证书 SHA-256：" + (String.IsNullOrEmpty(info.Signature) ? "无法读取" : info.Signature) +
+                (String.IsNullOrEmpty(info.Notice) ? String.Empty : "\n\n注意：" + info.Notice);
+            SetStatus("安装前确认", Path.GetFileName(path));
+            OnRuntimeLog("APK 信息：" + Path.GetFileName(path) + "；" + details.Replace("\n", "；"));
+            MessageBoxResult answer = MessageBox.Show(this,
+                "即将安装：\n" + Path.GetFileName(path) + "\n\n" + details +
+                "\n\n只安装你信任来源的 APK。继续安装？",
+                "确认安装 APK", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
+            return answer == MessageBoxResult.OK;
+        }
+
+        private async Task BackupPhoneAsync()
+        {
+            if (runtime.IsRunning)
+            {
+                SetStatus(StateText(state), "请先停止手机，再备份手机数据。");
+                return;
+            }
+            SaveFileDialog dialog = new SaveFileDialog
+            {
+                Title = "保存手机数据备份",
+                Filter = "ZIP 备份 (*.zip)|*.zip",
+                FileName = "DroidNest-phone-backup-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".zip",
+                AddExtension = true,
+                DefaultExt = ".zip",
+                OverwritePrompt = true
+            };
+            if (dialog.ShowDialog(this) != true) return;
+            commandBusy = true;
+            UpdateControls();
+            SetStatus("正在备份手机数据", "正在写入 ZIP 和 SHA-256 校验文件，请勿关闭客户端…");
+            try
+            {
+                string file = dialog.FileName;
+                string created = await Task.Run(delegate { return PhoneBackup.Create(root, file, CancellationToken.None); });
+                SetStatus("备份完成", created);
+                MessageBox.Show(this, "手机数据已备份到：\n" + created +
+                    "\n\n同目录的 .sha256 文件用于恢复前校验；含账号和个人信息，请妥善保管。",
+                    "备份完成", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                ReportError("备份手机数据失败", ex);
+            }
+            finally
+            {
+                commandBusy = false;
+                UpdateControls();
+            }
+        }
+
+        private async Task RestorePhoneAsync()
+        {
+            if (runtime.IsRunning)
+            {
+                SetStatus(StateText(state), "请先停止手机，再恢复手机数据。");
+                return;
+            }
+            OpenFileDialog dialog = new OpenFileDialog
+            {
+                Title = "选择手机数据备份",
+                Filter = "ZIP 备份 (*.zip)|*.zip",
+                CheckFileExists = true
+            };
+            if (dialog.ShowDialog(this) != true) return;
+            if (MessageBox.Show(this,
+                "恢复会把备份解压到：\n" + Path.Combine(root, "data") +
+                "\n\n目标必须没有手机数据；已有 data 时请先备份并移走。DroidNest 不会覆盖或合并现有数据。继续？",
+                "恢复手机数据", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK)
+                return;
+            commandBusy = true;
+            UpdateControls();
+            SetStatus("正在恢复手机数据", "正在校验并解压备份，请勿关闭客户端…");
+            try
+            {
+                string file = dialog.FileName;
+                await Task.Run(delegate { PhoneBackup.Restore(root, file, CancellationToken.None); });
+                SetStatus("恢复完成", "点击“启动手机”使用恢复的数据；应用和账号应保持原状。");
+            }
+            catch (Exception ex)
+            {
+                ReportError("恢复手机数据失败", ex);
+            }
+            finally
+            {
+                commandBusy = false;
+                UpdateControls();
+            }
+        }
+
+        private void RepairRuntime()
+        {
+            if (runtime.IsRunning)
+            {
+                SetStatus(StateText(state), "请先停止手机，再修复运行环境。");
+                return;
+            }
+            SetupWindow setup = new SetupWindow(root, AppDomain.CurrentDomain.BaseDirectory, true);
+            setup.Owner = this;
+            setup.ShowDialog();
+            if (setup.Completed)
+                SetStatus("运行环境已修复", "请关闭并重新打开 DroidNest，使新组件生效；手机数据未改动。");
+            else
+                SetStatus(StateText(state), "未完成修复；运行环境和手机数据保持原状。");
+            UpdateControls();
         }
 
         private void OnDragOver(object sender, DragEventArgs e)
@@ -562,6 +765,10 @@ namespace DroidNest
             installButton.IsEnabled = available && running;
             checkButton.IsEnabled = available && !running;
             dataButton.IsEnabled = !closeRequested && !runtimeDisposed;
+            backupButton.IsEnabled = available && !running;
+            restoreButton.IsEnabled = available && !running;
+            repairButton.IsEnabled = available && !running;
+            autoStartBox.IsEnabled = !closeRequested && !runtimeDisposed;
             foreach (Button button in phoneButtons)
                 button.IsEnabled = available && running;
         }

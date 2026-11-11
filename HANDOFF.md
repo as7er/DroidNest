@@ -8,8 +8,8 @@
 - 当前电脑工作目录：`F:\DroidNest`。新电脑可以使用其他目录。
 - 当前基线：`main` 已包含优先加固提交 `1a6c2e3`、CI 记录提交、`actions/checkout@v5` 升级和稳定性加固提交；工作区干净。第 4 节状态列反映这些提交。
 - 最初交接时（2026-11-11 12:00 前后）提交为 `d82f2134eb22f3f00621a051e8611706479e316f`（`Release v0.2.0 with guided runtime installation and persistent phone data`），当时没有未提交优化。
-- Codex 先完成检查和建议，用户回复“可以，按你建议继续”后服务报错。后续会话已完成优先加固三项（安装记录 SHA-256、动态磁盘预算、Windows CI 与离线边界测试）、提交、推送并通过远程 Actions；随后完成稳定性四项中的三项（下载续传、日志轮换、AVD 调优保留）与异常退出提示（部分）；其余项仍未实施。
-- 用户询问 EXE 何时发布；本轮结论是继续完善后再发布：三个 Android 组件仍缺已核验的可信 SHA-256，完整安装与 Android 启动尚未在新环境验收。
+- Codex 先完成检查和建议，用户回复“可以，按你建议继续”后服务报错。后续会话已完成优先加固三项（安装记录 SHA-256、动态磁盘预算、Windows CI 与离线边界测试）、稳定性四项（下载续传、日志轮换、AVD 调优保留、退出恢复）和功能四项（自动启动开关、数据备份/恢复、APK 信息、本地运行时健康/修复），并推送通过远程 Actions。
+- 用户询问 EXE 何时发布；结论是继续完善后再发布：三个 Android 组件仍缺已核验的独立 SHA-256，正式签名证书也未提供，完整安装后的真实 Android 启动仍需验收。
 
 ### 历史验证与本次核对的区别
 
@@ -113,21 +113,21 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Check-Environment.ps1 -Jso
 |优先级|建议|状态|起点与约束|
 |---|---|---|---|
 |优先|运行时完整性增加关键文件 SHA-256 校验|已完成（`1a6c2e3`，记录 format 2）|`src/RuntimeInstaller.cs` 的安装记录和验证；旧大小记录通过向导重新安装，不改写手机数据|
-|优先|固定 Android 下载组件可信 SHA-256，或使用签名元数据|部分完成：Platform Tools 已固定；Emulator、系统镜像、WebView/Build Tools 等其余三个组件仍缺独立可信摘要|`src/RuntimeInstaller.cs`；不能把同一不可信下载结果计算出的哈希当作预先信任锚|
+|优先|固定 Android 下载组件可信 SHA-256，或使用签名元数据|受阻：Platform Tools 已固定；2026-11-12 复核 `repository2-3.xml` 895 条与 `sys-img2-3.xml` 66 条校验全部为 SHA-1，模拟器归档页无 SHA-256|`src/RuntimeInstaller.cs`；不自行用不可信下载结果建立信任锚|
 |优先|统一、动态计算磁盘空间需求|已完成（`1a6c2e3`，配额感知策略）|`src/RuntimeInstaller.cs`、`src/AndroidRuntime.cs`；安装按下载、ZIP 展开、分配余量与签名输出动态检查|
 |优先|增加干净 Windows CI/验收矩阵|已完成：`.github/workflows/windows.yml` 远程运行 `43054551399`、`43054945598`、`43055075612`、`43065191544` 通过；真实 GUI/WHPX/硬件验收仍待执行|`VALIDATION.md`；区分自动脚本检查与真实硬件验收，不可用前者冒充后者|
 |稳定性|HTTP Range 断点续传|已完成：校验前缀、核对 `Content-Range`，范围不符或校验失败时重新完整下载|`src/RuntimeInstaller.cs` 的 `DownloadAsync`/`CopyPartAsync`；真实网络续传冒烟通过|
 |稳定性|日志轮换和清理|已完成：保留最近 16 个、最多 64 MiB，跳过 10 分钟内写入的文件|`src/AndroidRuntime.cs` 的 `TrimLogs`|
 |稳定性|保留自定义分辨率、内存、CPU、GPU 配置，或提供配置页|已完成（无配置页）：保留 config.ini 调优键，非法值回退，启动参数使用同一 GPU 模式|`src/AvdConfig.cs`、`src/AndroidRuntime.cs` 的 `PrepareAvd()`|
-|稳定性|Emulator/scrcpy 异常退出后的恢复入口|部分完成：状态区显示退出组件与模拟器日志，修复后可重新启动；不自动重连或自动重启|`src/AndroidRuntime.cs` 的 `ObserveExitAsync`、`LastExitReason`；`src/MainWindow.cs`|
-|功能|关闭自动启动手机的选项|待完成|启动流程和主窗口|
-|功能|手机数据一键备份/恢复|待完成|基于现有停机、迁移、不覆盖边界设计；现有 Local 打包不等于 GUI 功能已实现|
-|功能|APK 安装前展示包名、版本和签名摘要|待完成|APK 安装入口；不要为了展示信息先安装待检查 APK|
-|功能|运行时修复、更新检查、版本迁移提示|待完成|安装器、向导和现有持久数据路径|
-|发布|EXE 和发布校验文件签名|待完成|正式签名证书及安全保管是前置条件；当前 EXE 未作 Authenticode 签名|
+|稳定性|Emulator/scrcpy 异常退出后的恢复入口|已完成：画面进程退出时自动重连（Android 不重启），模拟器/ADB 退出时显示原因与日志并可重启|`src/AndroidRuntime.cs` 的 `ObserveExitAsync`/`TryReconnectDisplayAsync`；`src/MainWindow.cs` 重新接入画面|
+|功能|关闭自动启动手机的选项|已完成：主界面复选框，保存到客户端 `settings.json`|`src/ClientSettings.cs`、`src/MainWindow.cs`|
+|功能|手机数据一键备份/恢复|已完成：ZIP + SHA-256，恢复前校验，拒绝覆盖/合并和穿越/链接条目|`src/PhoneBackup.cs`、主界面“备份/恢复手机数据”|
+|功能|APK 安装前展示包名、版本和签名摘要|已完成：aapt2 读取包名/版本，apksigner 或 v1 证书读取 SHA-256，确认后才安装|`src/ApkInspector.cs`；缺少工具时提示，不代替用户决定|
+|功能|运行时修复、更新检查、版本迁移提示|部分完成：启动时 `DescribeHealth` 识别旧记录、版本漂移、缺 Build Tools，并提供“修复运行环境…”；没有联网检查新版本|`RuntimeInstaller.DescribeHealth`、`SetupWindow` 修复模式|
+|发布|EXE 和发布校验文件签名|受阻：本机没有代码签名证书；已提供 `Sign-Release.ps1`，无证书时失败，不生成自签名替代|正式证书与安全保管是前置条件；签名未执行|
 |后续评估|SDK-style/.NET 8 WPF 迁移|未决定|原建议仅为“后续可评估”，未决定迁移，不默认执行|
 
-已完成的只有优先加固中的三项，以及用户 2026-11-11 同意继续完善后实施的稳定性三项与异常退出提示；其余建议仍未批准、未实现。继续时先明确下一轮边界，不要擅自删除建议，也不要声称已批准某个缩减范围。
+已完成的：优先加固三项、稳定性四项、功能四项（运行时更新检查只覆盖本地记录/版本一致性，不含联网检查）。仍受阻：三个组件可信 SHA-256、正式发布签名。其余建议（自动检查更新、.NET 8 迁移）未实现。
 
 ### 相关文件导航
 
@@ -136,14 +136,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Check-Environment.ps1 -Jso
 - `src/AppPaths.cs`：持久路径及旧目录迁移。
 - `src/AndroidRuntime.cs`：宿主检查、AVD、Android 进程与操作。
 - `src/AvdConfig.cs`：AVD `config.ini` 结构键与用户调优键合并、取值校验。
+- `src/ClientSettings.cs`：客户端设置（自动启动）读写。
+- `src/PhoneBackup.cs`：手机数据 ZIP 备份/恢复与边界校验。
+- `src/ApkInspector.cs`：安装前读取包名、版本与签名证书。
 - `src/PhoneDisplayHost.cs`：原生视频子窗口集成。
 - `src/MainWindow.cs`、`src/Program.cs`：主 UI 与启动入口。
-- `build.ps1`、`New-PortablePackage.ps1`、`Check-Environment.ps1`：构建、白名单打包和诊断。
+- `build.ps1`、`New-PortablePackage.ps1`、`Sign-Release.ps1`、`Check-Environment.ps1`：构建、白名单打包、发布签名和诊断。
 - `README.md`、`CHANGELOG.md`、`RELEASE-NOTES.md`、`VALIDATION.md`：使用约定、版本记录和验证证据。
 
 ## 5. 可以直接发给新电脑上的助手
 
-> 请先阅读仓库根目录 HANDOFF.md、README.md 和 VALIDATION.md，恢复 DroidNest 工作。`main` 已包含优先加固提交 `1a6c2e3`：安装记录 SHA-256、动态磁盘预算、Windows CI 与离线边界测试，远程 Actions 已通过。前次 Codex 提出的其余建议仍未批准、未实现。先检查新机仓库当前状态并保留已有变更；根据交接文件第 4 节的状态明确下一轮范围，再继续实现和针对性验证。不要重复已完成的三项加固，不要删除或覆盖手机数据，不要把私人运行时/数据/密钥提交到 Git，不要把历史验证当作新机已通过。EXE 暂不发布：三个 Android 组件仍缺已核验的可信 SHA-256。
+> 请先阅读仓库根目录 HANDOFF.md、README.md 和 VALIDATION.md，恢复 DroidNest 工作。`main` 已包含优先加固与稳定性/功能加固：安装记录 SHA-256、动态磁盘预算、下载续传、日志轮换、AVD 配置保留、画面自动重连、自动启动开关、手机数据备份/恢复、APK 信息与运行时健康检查；远程 Actions 已通过。仍未解决：Emulator、系统镜像、Build Tools 的独立可信 SHA-256，以及 EXE 的正式 Authenticode 签名。先检查新机仓库当前状态并保留已有变更；根据交接文件第 4 节状态确定下一轮范围，再继续实现和针对性验证。不要重复已完成项，不要删除或覆盖手机数据，不要把私人运行时/数据/密钥提交到 Git，不要把历史验证当作新机已通过。
 
 ## 6. 历史追溯（仅旧机可选）
 

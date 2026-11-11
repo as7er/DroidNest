@@ -33,3 +33,5 @@ jobs:
         run: .\tests\priority-hardening.ps1
       - name: Exercise resume, AVD config and log rotation boundaries
         run: .\tests\stability-hardening.ps1
+      - name: Exercise preferences, backup and runtime health boundaries
+        run: .\tests\client-features.ps1
