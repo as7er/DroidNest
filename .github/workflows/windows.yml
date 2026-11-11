@@ -1,0 +1,33 @@
+name: Windows client boundaries
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  client-boundaries:
+    name: .NET Framework build and offline boundaries
+    runs-on: windows-2022
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - name: Check out public source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Parse tracked PowerShell scripts
+        run: .\tests\parse-powershell.ps1
+      - name: Build C# 5 client with .NET Framework
+        run: .\build.ps1
+      - name: Exercise isolated client packaging
+        run: .\tests\client-package-smoke.ps1
+      - name: Exercise offline installer archive boundaries
+        run: .\tests\installer-boundary-smoke.ps1
+      - name: Exercise offline receipt and disk boundaries
+        run: .\tests\priority-hardening.ps1

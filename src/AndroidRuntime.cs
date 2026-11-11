@@ -396,20 +396,11 @@ namespace DroidNest
                 }
                 try
                 {
-                    ulong available, total, free;
-                    if (!Native.GetDiskFreeSpaceEx(directory, out available, out total, out free))
-                        throw new Win32Exception(Marshal.GetLastWin32Error());
-                    if (available < 8UL * 1024 * 1024 * 1024)
-                    {
-                        report.AppendLine("启动前至少需要 8 GiB 可用磁盘空间：" + directory + "，当前 " +
-                            (available / (1024.0 * 1024 * 1024)).ToString("F1", CultureInfo.InvariantCulture) +
-                            " GiB。请释放空间，勿删除需要保留的手机数据。");
-                        usable = false;
-                    }
+                    RuntimeDiskSpace.Require(directory, RuntimeDiskSpace.PhoneReserveBytes);
                 }
                 catch (Exception ex)
                 {
-                    report.AppendLine("无法确认至少 8 GiB 可用磁盘空间：" + directory + "；" + ex.Message);
+                    report.AppendLine("启动前磁盘空间检查失败：" + ex.Message);
                     usable = false;
                 }
             }
@@ -1150,9 +1141,6 @@ namespace DroidNest
             internal static extern bool IsWow64Process2(IntPtr process, out ushort processMachine, out ushort nativeMachine);
             [DllImport("kernel32.dll")]
             internal static extern IntPtr GetCurrentProcess();
-            [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-            [return: MarshalAs(UnmanagedType.Bool)]
-            internal static extern bool GetDiskFreeSpaceEx(string directory, out ulong available, out ulong total, out ulong free);
             [DllImport("kernel32.dll", SetLastError = true)]
             [return: MarshalAs(UnmanagedType.Bool)]
             internal static extern bool GlobalMemoryStatusEx(ref MemoryStatus status);

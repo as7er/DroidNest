@@ -48,9 +48,6 @@ namespace DroidNestPreflight {
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool GlobalMemoryStatusEx(ref MemoryStatus info);
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool GetDiskFreeSpaceEx(string directory, out ulong available, out ulong total, out ulong free);
         [DllImport("WinHvPlatform.dll")]
         public static extern int WHvGetCapability(int code, out int value, uint size, out uint written);
         public static ushort NativeMachine() {
@@ -101,6 +98,19 @@ foreach ($relative in @('DroidNest.exe', 'DroidNest.exe.config', 'tools\SignWebV
 
 if (-not $Launch) {
 Add-Check 'state-root' 'pass' ('运行时、手机数据和日志的持久目录：' + $stateRoot)
+# Load the compiled policy only in diagnostic mode; -Launch must still open the installer without runtime prerequisites.
+$diskPolicyError = $null
+$diskAvailableMethod = $null
+try {
+    $assembly = [Reflection.Assembly]::LoadFrom((Join-Path $appRoot 'DroidNest.exe'))
+    $diskPolicy = $assembly.GetType('DroidNest.RuntimeDiskSpace', $true)
+    $flags = [Reflection.BindingFlags]::Static -bor [Reflection.BindingFlags]::NonPublic
+    $reserveField = $diskPolicy.GetField('PhoneReserveBytes', $flags)
+    $diskAvailableMethod = $diskPolicy.GetMethod('AvailableBytes', $flags)
+    if ($null -eq $reserveField -or $null -eq $diskAvailableMethod) { throw '客户端缺少共享磁盘策略，请重新完整解压同一版本的客户端 ZIP。' }
+    [long]$phoneReserveBytes = $reserveField.GetRawConstantValue()
+    $phoneReserveGiB = '{0:0.#}' -f ($phoneReserveBytes / 1GB)
+} catch { $diskPolicyError = $_.Exception.GetBaseException().Message }
 $probeDirectories = @('')
 # Never create phone directories before consent-driven legacy migration.
 if (Test-Path -LiteralPath (Join-Path $stateRoot 'runtime\installation.json') -PathType Leaf) {
@@ -119,12 +129,12 @@ foreach ($relative in $probeDirectories) {
         Add-Check ('write:' + $relative) 'pass' ('可写入：' + $directory)
     } catch { Add-Check ('write:' + $relative) 'fail' ('持久目录不可写，请检查当前用户权限，不要通过自动提权解决：' + $directory + '；' + $_.Exception.Message) }
     try {
-        [uint64]$available = 0; [uint64]$total = 0; [uint64]$free = 0
-        if (-not [DroidNestPreflight.Native]::GetDiskFreeSpaceEx($directory, [ref]$available, [ref]$total, [ref]$free)) { throw (New-Object ComponentModel.Win32Exception) }
+        if ($null -ne $diskPolicyError) { throw ('无法加载客户端共享磁盘策略：' + $diskPolicyError) }
+        [long]$available = $diskAvailableMethod.Invoke($null, [object[]]@($directory))
         $space = '{0:N1}' -f ($available / 1GB)
-        if ($available -ge 8GB) { Add-Check ('disk:' + $relative) 'pass' "可用磁盘空间 $space GiB：$directory" }
-        else { Add-Check ('disk:' + $relative) 'fail' "启动前至少需要 8 GiB 可用空间（当前 $space GiB）：$directory。请释放空间，勿删除需要保留的手机数据。" }
-    } catch { Add-Check ('disk:' + $relative) 'fail' ('无法确认至少 8 GiB 可用空间：' + $directory + '；' + $_.Exception.Message) }
+        if ($available -ge $phoneReserveBytes) { Add-Check ('disk:' + $relative) 'pass' "当前用户可用磁盘空间 $space GiB：$directory" }
+        else { Add-Check ('disk:' + $relative) 'fail' "启动前至少需要 $phoneReserveGiB GiB 当前用户可用空间（当前 $space GiB）：$directory。请释放空间，勿删除需要保留的手机数据。" }
+    } catch { Add-Check ('disk:' + $relative) 'fail' ('无法确认启动前可用磁盘空间：' + $directory + '；' + $_.Exception.GetBaseException().Message) }
 }
 try {
     $memory = New-Object DroidNestPreflight.Native+MemoryStatus

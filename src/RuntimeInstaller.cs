@@ -91,13 +91,23 @@ namespace DroidNest
                 if (!File.Exists(receipt)) return true;
                 if (new FileInfo(receipt).Length > 8 * 1024 * 1024) return false;
                 var document = JsonObject(File.ReadAllText(receipt));
-                if (Convert.ToInt32(document["format"], CultureInfo.InvariantCulture) != 1) return false;
+                if (Convert.ToInt32(document["format"], CultureInfo.InvariantCulture) != 2) return false;
                 var lengths = (Dictionary<string, object>)document["files"];
+                if (lengths == null) return false;
                 foreach (string relative in RequiredFiles) if (!lengths.ContainsKey(relative)) return false;
                 foreach (var item in lengths)
                 {
                     string path = SafePath(runtime, item.Key);
                     if (!File.Exists(path) || new FileInfo(path).Length != Convert.ToInt64(item.Value, CultureInfo.InvariantCulture)) return false;
+                }
+                var hashes = (Dictionary<string, object>)document["sha256"];
+                if (hashes == null) return false;
+                foreach (string relative in RequiredFiles)
+                {
+                    object expected;
+                    if (!hashes.TryGetValue(relative, out expected) || !(expected is string) ||
+                        !Regex.IsMatch((string)expected, "^[0-9a-f]{64}$") ||
+                        HashFile(SafePath(runtime, relative), "SHA256", CancellationToken.None) != (string)expected) return false;
                 }
                 return true;
             }
@@ -153,7 +163,9 @@ namespace DroidNest
                 }
                 summary.AppendLine("\r\nGoogle 下载可能通过其 HTTPS redirector.gvt1.com CDN；WebView 通过 LineageOS Git LFS 授权的 HTTPS 对象存储。所有校验通过后才解压或执行。");
                 summary.AppendLine("JDK/build-tools 仅在本地准备阶段使用；WebView 使用公开 AOSP 测试密钥重新签名并验证。该开发镜像不适合敏感数据或生产用途，不包含 Google Play。安装不代替您取得许可或再分发授权。");
-                summary.AppendLine("预留至少 12 GiB 空间（含缓存、解压和签名）；修复还需保留旧运行时备份。取消后可重试并复用校验通过的缓存。仅点击同意并安装后才下载组件。");
+                summary.AppendLine(String.Format(CultureInfo.InvariantCulture,
+                    "下载阶段最多新增 {0:N2} GiB 缓存，另保留 {1:N0} GiB 手机运行空间。下载校验完成后，按 ZIP 实际展开大小、文件分配余量和 WebView 签名输出重新计算空间；空间不足时不解压、不替换旧运行时。旧运行时及旧缓存已占用空间不会视为可回收。取消后可复用校验通过的缓存。仅点击同意并安装后才下载组件。",
+                    downloads.Sum(d => d.Size) / 1073741824.0, RuntimeDiskSpace.PhoneReserveBytes / 1073741824.0));
                 var terms = new StringBuilder();
                 foreach (var license in licenses) terms.AppendLine(license.Key + "\r\n" + license.Value + "\r\n");
                 terms.AppendLine("其余组件许可及依赖许可（请打开以下上游链接阅读；解压后保留原始 NOTICE/LICENSE）：");
@@ -182,10 +194,20 @@ namespace DroidNest
                     Directory.CreateDirectory(stage);
                     try
                     {
+                        var archives = new Dictionary<string, string>();
                         foreach (RuntimeDownload download in plan.Downloads)
                         {
                             token.ThrowIfCancellationRequested();
-                            string file = await DownloadAsync(download, cache, progress, token).ConfigureAwait(false);
+                            archives.Add(download.Id, await DownloadAsync(download, cache, progress, token).ConfigureAwait(false));
+                        }
+                        long preparationBytes = PreparationBytes(plan.Downloads, archives, token);
+                        Report(progress, String.Format(CultureInfo.InvariantCulture,
+                            "校验完成：解压、签名及手机运行预留共需 {0:N2} GiB 新增可用空间；现有运行时保留。", preparationBytes / 1073741824.0));
+                        RuntimeDiskSpace.Require(root, preparationBytes);
+                        foreach (RuntimeDownload download in plan.Downloads)
+                        {
+                            token.ThrowIfCancellationRequested();
+                            string file = archives[download.Id];
                             string destination = SafePath(stage, download.Destination);
                             if (download.Id == "webview" || download.Id == "key" || download.Id == "certificate")
                             {
@@ -204,12 +226,7 @@ namespace DroidNest
                         string runtime = SafePath(stage, "runtime");
                         File.WriteAllText(Path.Combine(runtime, "installation-licenses.txt"), plan.Licenses, new UTF8Encoding(false));
                         File.WriteAllText(Path.Combine(runtime, "installation-plan.txt"), plan.Summary, new UTF8Encoding(false));
-                        var lengths = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-                        foreach (string file in Directory.EnumerateFiles(runtime, "*", SearchOption.AllDirectories))
-                            lengths.Add(file.Substring(runtime.Length + 1).Replace('\\', '/'), new FileInfo(file).Length);
-                        File.WriteAllText(Path.Combine(runtime, "installation.json"), new JavaScriptSerializer().Serialize(new {
-                            format = 1, installedUtc = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture), files = lengths
-                        }), new UTF8Encoding(false));
+                        WriteReceipt(runtime, token);
                         token.ThrowIfCancellationRequested();
                         string target = SafePath(root, "runtime");
                         string backup = SafePath(root, "runtime.previous-" + Guid.NewGuid().ToString("N"));
@@ -223,6 +240,52 @@ namespace DroidNest
                     finally { RemoveOwnedStage(stage); }
                 }
             }, token);
+        }
+
+        private static void WriteReceipt(string runtime, CancellationToken token)
+        {
+            var lengths = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            foreach (string file in Directory.EnumerateFiles(runtime, "*", SearchOption.AllDirectories))
+            {
+                token.ThrowIfCancellationRequested();
+                string relative = file.Substring(runtime.Length + 1).Replace('\\', '/');
+                if (relative != "installation.json") lengths.Add(relative, new FileInfo(file).Length);
+            }
+            var hashes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string relative in RequiredFiles)
+                hashes.Add(relative, HashFile(SafePath(runtime, relative), "SHA256", token));
+            File.WriteAllText(Path.Combine(runtime, "installation.json"), new JavaScriptSerializer().Serialize(new {
+                format = 2, installedUtc = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture), files = lengths, sha256 = hashes
+            }), new UTF8Encoding(false));
+        }
+
+        private static long PreparationBytes(IEnumerable<RuntimeDownload> downloads, IDictionary<string, string> archives, CancellationToken token)
+        {
+            // Cache and the old runtime already consume free space. Renaming the old runtime needs no second copy.
+            // Reserve the bounded signed APK output, receipt/metadata and per-file allocation overhead as well.
+            long required = checked(RuntimeDiskSpace.PhoneReserveBytes + WebViewSize + 32L * 1024 * 1024 + 8L * 1024 * 1024);
+            foreach (RuntimeDownload download in downloads)
+            {
+                token.ThrowIfCancellationRequested();
+                if (download.Id == "webview" || download.Id == "key" || download.Id == "certificate")
+                    required = checked(required + download.Size + 65536);
+                else
+                {
+                    using (var file = File.OpenRead(archives[download.Id]))
+                    using (var archive = new ZipArchive(file, ZipArchiveMode.Read))
+                    {
+                        long expanded = 0;
+                        foreach (ZipArchiveEntry entry in archive.Entries)
+                        {
+                            token.ThrowIfCancellationRequested();
+                            expanded = checked(expanded + entry.Length);
+                            if (expanded > 16L * 1024 * 1024 * 1024) throw new InvalidDataException("ZIP exceeds the 16 GiB extraction safety limit.");
+                            required = checked(required + entry.Length + 65536);
+                        }
+                    }
+                }
+            }
+            return required;
         }
 
         private static RuntimeDownload AndroidPackage(XDocument document, string packagePath, string revision, string id,
@@ -246,8 +309,17 @@ namespace DroidNest
             Uri url = new Uri(new Uri(baseUrl), Child(complete, "url").Value);
             if (url.Host != "dl.google.com" || !url.AbsolutePath.StartsWith("/android/repository/", StringComparison.Ordinal))
                 throw new InvalidDataException("Unexpected Android archive origin: " + url);
-            return new RuntimeDownload(id, packagePath + " " + revision, url.AbsoluteUri, checksum.Value.Trim(), algorithm,
-                Int64.Parse(Child(complete, "size").Value, CultureInfo.InvariantCulture), prefix, destination);
+            long size = Int64.Parse(Child(complete, "size").Value, CultureInfo.InvariantCulture);
+            string digest = checksum.Value.Trim();
+            if (id == "platform-tools")
+            {
+                // Independently published by Genymobile/scrcpy v5.0.1: app/deps/adb_windows.sh.
+                if (revision != "37.0.1" || url.AbsoluteUri != Repository + "platform-tools_r37.0.1-win.zip" || size != 8044989)
+                    throw new InvalidDataException("Pinned Platform Tools archive changed. Update the client from its trusted release source.");
+                algorithm = "SHA256";
+                digest = "45f4d63113e895ebde0c90f194099a4676b6ac653bd28d54314a9e022bbc1a99";
+            }
+            return new RuntimeDownload(id, packagePath + " " + revision, url.AbsoluteUri, digest, algorithm, size, prefix, destination);
         }
 
         private static XElement Child(XElement element, string name)
@@ -391,6 +463,7 @@ namespace DroidNest
             {
                 try
                 {
+                    RuntimeDiskSpace.Require(cache, checked(download.Size + RuntimeDiskSpace.PhoneReserveBytes));
                     Report(progress, "正在下载 " + download.Name + "（" + (attempt + 1) + "/3）");
                     string url = download.Id == "webview" ? await ResolveWebViewAsync(token).ConfigureAwait(false) : GoogleAddress(download.Url, attempt);
                     using (var deadline = CancellationTokenSource.CreateLinkedTokenSource(token))
