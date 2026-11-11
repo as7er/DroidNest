@@ -115,7 +115,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Check-Environment.ps1 -Jso
 |优先|运行时完整性增加关键文件 SHA-256 校验|已完成（`1a6c2e3`，记录 format 2）|`src/RuntimeInstaller.cs` 的安装记录和验证；旧大小记录通过向导重新安装，不改写手机数据|
 |优先|固定 Android 下载组件可信 SHA-256，或使用签名元数据|部分完成：Platform Tools 已固定；Emulator、系统镜像、WebView/Build Tools 等其余三个组件仍缺独立可信摘要|`src/RuntimeInstaller.cs`；不能把同一不可信下载结果计算出的哈希当作预先信任锚|
 |优先|统一、动态计算磁盘空间需求|已完成（`1a6c2e3`，配额感知策略）|`src/RuntimeInstaller.cs`、`src/AndroidRuntime.cs`；安装按下载、ZIP 展开、分配余量与签名输出动态检查|
-|优先|增加干净 Windows CI/验收矩阵|已完成：`.github/workflows/windows.yml` 远程运行 `43054551399`、`43054945598`、`43055075612` 通过；真实 GUI/WHPX/硬件验收仍待执行|`VALIDATION.md`；区分自动脚本检查与真实硬件验收，不可用前者冒充后者|
+|优先|增加干净 Windows CI/验收矩阵|已完成：`.github/workflows/windows.yml` 远程运行 `43054551399`、`43054945598`、`43055075612`、`43065191544` 通过；真实 GUI/WHPX/硬件验收仍待执行|`VALIDATION.md`；区分自动脚本检查与真实硬件验收，不可用前者冒充后者|
 |稳定性|HTTP Range 断点续传|已完成：校验前缀、核对 `Content-Range`，范围不符或校验失败时重新完整下载|`src/RuntimeInstaller.cs` 的 `DownloadAsync`/`CopyPartAsync`；真实网络续传冒烟通过|
 |稳定性|日志轮换和清理|已完成：保留最近 16 个、最多 64 MiB，跳过 10 分钟内写入的文件|`src/AndroidRuntime.cs` 的 `TrimLogs`|
 |稳定性|保留自定义分辨率、内存、CPU、GPU 配置，或提供配置页|已完成（无配置页）：保留 config.ini 调优键，非法值回退，启动参数使用同一 GPU 模式|`src/AvdConfig.cs`、`src/AndroidRuntime.cs` 的 `PrepareAvd()`|
