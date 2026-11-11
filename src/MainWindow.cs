@@ -220,7 +220,9 @@ namespace DroidNest
                 {
                     DetachPhoneDisplay();
                     state = PhoneState.Idle;
-                    SetStatus(StateText(state), "Android 运行环境已退出。可以重新启动；应用与数据仍保存在本机。");
+                    string why = runtime.LastExitReason;
+                    SetStatus(StateText(state), "Android 运行环境已退出。可以重新启动；应用与数据仍保存在本机。" +
+                        (String.IsNullOrEmpty(why) ? String.Empty : " " + why));
                     UpdateControls();
                 }
             };

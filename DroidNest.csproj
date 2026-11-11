@@ -36,6 +36,7 @@
     <Compile Include="src\SetupWindow.cs" />
     <Compile Include="src\RuntimeInstaller.cs" />
     <Compile Include="src\RuntimeDiskSpace.cs" />
+    <Compile Include="src\AvdConfig.cs" />
     <None Include="DroidNest.exe.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

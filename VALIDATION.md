@@ -13,6 +13,7 @@
 | 安全客户端打包 | `tests/client-package-smoke.ps1` | 将公开输入复制到临时的中文/空格路径，在独立 `dist` 目录使用唯一版本号打包；逐项核对公开文件清单、文件字节和 SHA-256；排除合成的运行时、数据、日志与密钥样本；拒绝 Client + IncludeData 及覆盖现有输出。不读取真实私人运行时或手机数据，不生成 Local 包。 |
 | 安装器路径 / ZIP 边界 | `tests/installer-boundary-smoke.ps1` | 直接调用已编译安装器的路径和解压逻辑，验证路径穿越、绝对路径、ADS、Windows 设备名、尾部别名、链接、错误 ZIP 布局及损坏 ZIP 被拒绝，并以有效 ZIP 验证成功路径。全部输入为临时合成文件，检查暂存区外的哨兵文件不变；不启动 GUI、不联网、不构造真实安装器或访问用户运行时。 |
 | 安装记录 / 磁盘 / 哈希边界 | `tests/priority-hardening.ps1` | 隔离检查安装记录、磁盘预算与哈希行为；不替代真实卷配额、下载、GUI 或硬件验收。 |
+| 续传 / AVD 配置 / 日志轮换 | `tests/stability-hardening.ps1` | 用合成字节流检查 `Content-Range` 协商、部分文件范围、续传后的 SHA-256 校验、损坏前缀拒绝；检查 `PrepareAvd` 默认值与用户调优项保留（含非法值回退）；检查日志数量与总大小上限且不删除仍在写入的日志。不联网、不启动模拟器。 |
 
 这些脚本位于已提交的 `tests/`，不依赖被忽略的 `verification/`。工作流不使用私人运行时、手机数据或签名机密，不上传打包产物，也不声称验证 WHPX、GPU 或真实手机运行。测试临时目录在 `finally` 中清理；仓库现有 `dist` 和 `%LOCALAPPDATA%\DroidNest` 不受测试修改。
 
@@ -24,6 +25,7 @@
 .\tests\client-package-smoke.ps1
 .\tests\installer-boundary-smoke.ps1
 .\tests\priority-hardening.ps1
+.\tests\stability-hardening.ps1
 ```
 
 语法检查包含未被忽略的新增脚本，无需为验证而暂存变更。构建会更新仓库根目录下被忽略的 `DroidNest.exe`。脚本未启动客户端或改动手机数据。
@@ -35,6 +37,13 @@
 - `Check-Environment.ps1 -Launch -Json` 返回 ready/launched 为 true，实际打开了 WPF 安装向导；截图时显示镜像解压中，随后通过窗口关闭正常取消，进程退出。取消后现有 `installation.json` 修改时间仍为 2026-11-10 20:58:57。未完成真实安装或 Android 启动，未运行远程 Actions，未生成私人迁移包；此记录不能视为安装成功验收。
 - 下载 SHA-256 可信固定仅完成 Platform Tools。Google 两份官方仓库 XML 仍只为其余三个固定组件提供 SHA-1；模拟器官方 SHA-256 归档页返回 404/502，独立 Nix 记录也只有 SHA-1。直接获取归档的交叉核验尝试超时，未取得可用结果；不会据此生成或宣称可信 SHA-256。需要可核验的发布摘要或签名元数据后才能完成此项。
 - 接续调查通过真实浏览器确认模拟器旧归档链接为失效页面；Debian Build Tools 35 条目对应 Linux 归档，不能用作 Windows 摘要依据。用户明确选择严格策略：不接受通过 Google HTTPS 加历史 SHA-1 交叉核验后自行建立 SHA-256 基线，剩余三个组件须等待独立发布摘要或签名元数据。
+
+### 2026-11-12 本地稳定性加固验证
+
+- `build.ps1` 编译通过；语法检查覆盖 8 个源码脚本；隔离打包、ZIP/路径边界与 `priority-hardening.ps1` 均通过。
+- 新增 `tests/stability-hardening.ps1` 通过：`Content-Range` 协商（偏移、总量、单位、越界与缺失头）、部分文件上限、续传后前缀加后缀的 SHA-256、拼接损坏前缀与截断流的拒绝、`PrepareAvd` 默认值与调优项保留及非法值回退、日志数量/大小轮换且不删除 10 分钟内写入的文件。
+- 真实网络续传冒烟：以公开 AOSP `testkey.pk8`（1217 字节）调用编译后的下载路径，先完整下载，再预先写入 600 字节后重试；服务器返回 206，最终 1217 字节且 SHA-256 与固定值一致。该检查使用被忽略的 `verification/resume-smoke.ps1`，不进入 CI，也不使用私有运行时。
+- 未启动模拟器，未验证真实 Android 启动、GPU 模式切换后的画面、异常退出后的 UI 重连或干净 Windows 环境；这些仍需手动验收。本次提交的远程 Actions 结果以对应提交的 Actions 为准。
 
 
 ## 必须单独执行的 Windows 手动验收

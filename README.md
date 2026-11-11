@@ -44,6 +44,13 @@
 
 关闭窗口时先刷新 Android 存储，再停止本实例 Android 和视频进程，不清除手机应用数据。备份或迁移之前必须正常停止手机；备份 `data` 可能包含账号、凭据及个人信息。
 
+### 下载续传、日志与手机配置
+
+- 组件下载中断或失败后重试时，从 `.partial` 已写入的字节继续（HTTP Range）；服务器不支持或返回的范围不符时自动改为完整下载。每次成功仍按固定大小与 SHA-256 校验，校验失败会丢弃并重下，不会执行未通过校验的文件。
+- `logs` 目录只保留最近 16 个日志文件、合计最多 64 MiB；每次启动手机前清理更旧的日志，最近 10 分钟内仍在写入的文件不会被删除。可直接删除整个 `logs` 目录，不影响手机数据。
+- 手机进程异常退出时，状态区会显示退出的是模拟器、私有 ADB 服务还是画面进程以及模拟器日志路径；修复或重试后点击“启动手机”即可，数据保留。
+- 自定义手机配置写在 `data\avd\DroidNest.avd\config.ini`。修改前先停止手机，并保留下列可调项：`hw.ramSize`（512–8192 MB）、`hw.cpu.ncore`（1–8）、`hw.lcd.width` / `hw.lcd.height`（320–4096）、`hw.lcd.density`（120–640）、`vm.heapSize`（16–1024 MB）、`disk.dataPartition.size`（512M–64G）、`hw.gpu.mode`（auto、host、swiftshader、swiftshader_indirect、angle、angle_indirect）。下次启动保留这些值，非法或缺失值回退默认；`image.sysdir.1`、`AvdId`、`target` 等结构键仍由客户端写入。
+
 ## 操作
 
 - 点击手机画面模拟触摸，鼠标拖动滑动页面，键盘输入文字。

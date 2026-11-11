@@ -31,3 +31,5 @@ jobs:
         run: .\tests\installer-boundary-smoke.ps1
       - name: Exercise offline receipt and disk boundaries
         run: .\tests\priority-hardening.ps1
+      - name: Exercise resume, AVD config and log rotation boundaries
+        run: .\tests\stability-hardening.ps1

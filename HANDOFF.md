@@ -6,9 +6,9 @@
 
 - 仓库：<https://github.com/as7er/DroidNest>
 - 当前电脑工作目录：`F:\DroidNest`。新电脑可以使用其他目录。
-- 当前基线：`main` 已包含优先加固提交 `1a6c2e3`、CI 记录提交和 `actions/checkout@v5` 升级；工作区干净。第 4 节状态列反映这些提交。
+- 当前基线：`main` 已包含优先加固提交 `1a6c2e3`、CI 记录提交、`actions/checkout@v5` 升级和稳定性加固提交；工作区干净。第 4 节状态列反映这些提交。
 - 最初交接时（2026-11-11 12:00 前后）提交为 `d82f2134eb22f3f00621a051e8611706479e316f`（`Release v0.2.0 with guided runtime installation and persistent phone data`），当时没有未提交优化。
-- Codex 先完成检查和建议，用户回复“可以，按你建议继续”后服务报错。后续会话已完成优先加固三项（安装记录 SHA-256、动态磁盘预算、Windows CI 与离线边界测试）、提交、推送并通过远程 Actions；三项之外的剩余项仍未实施。
+- Codex 先完成检查和建议，用户回复“可以，按你建议继续”后服务报错。后续会话已完成优先加固三项（安装记录 SHA-256、动态磁盘预算、Windows CI 与离线边界测试）、提交、推送并通过远程 Actions；随后完成稳定性四项中的三项（下载续传、日志轮换、AVD 调优保留）与异常退出提示（部分）；其余项仍未实施。
 - 用户询问 EXE 何时发布；本轮结论是继续完善后再发布：三个 Android 组件仍缺已核验的可信 SHA-256，完整安装与 Android 启动尚未在新环境验收。
 
 ### 历史验证与本次核对的区别
@@ -116,10 +116,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Check-Environment.ps1 -Jso
 |优先|固定 Android 下载组件可信 SHA-256，或使用签名元数据|部分完成：Platform Tools 已固定；Emulator、系统镜像、WebView/Build Tools 等其余三个组件仍缺独立可信摘要|`src/RuntimeInstaller.cs`；不能把同一不可信下载结果计算出的哈希当作预先信任锚|
 |优先|统一、动态计算磁盘空间需求|已完成（`1a6c2e3`，配额感知策略）|`src/RuntimeInstaller.cs`、`src/AndroidRuntime.cs`；安装按下载、ZIP 展开、分配余量与签名输出动态检查|
 |优先|增加干净 Windows CI/验收矩阵|已完成：`.github/workflows/windows.yml` 远程运行 `43054551399`、`43054945598`、`43055075612` 通过；真实 GUI/WHPX/硬件验收仍待执行|`VALIDATION.md`；区分自动脚本检查与真实硬件验收，不可用前者冒充后者|
-|稳定性|HTTP Range 断点续传|待完成|`src/RuntimeInstaller.cs`；历史指出失败重试重新下载|
-|稳定性|日志轮换和清理|待完成|`src/AndroidRuntime.cs`|
-|稳定性|保留自定义分辨率、内存、CPU、GPU 配置，或提供配置页|待完成|`src/AndroidRuntime.cs` 的 `PrepareAvd()`；历史指出每次写入固定配置|
-|稳定性|Emulator/scrcpy 异常退出后的恢复入口|待完成|`src/AndroidRuntime.cs`、`src/PhoneDisplayHost.cs`、`src/MainWindow.cs`|
+|稳定性|HTTP Range 断点续传|已完成：校验前缀、核对 `Content-Range`，范围不符或校验失败时重新完整下载|`src/RuntimeInstaller.cs` 的 `DownloadAsync`/`CopyPartAsync`；真实网络续传冒烟通过|
+|稳定性|日志轮换和清理|已完成：保留最近 16 个、最多 64 MiB，跳过 10 分钟内写入的文件|`src/AndroidRuntime.cs` 的 `TrimLogs`|
+|稳定性|保留自定义分辨率、内存、CPU、GPU 配置，或提供配置页|已完成（无配置页）：保留 config.ini 调优键，非法值回退，启动参数使用同一 GPU 模式|`src/AvdConfig.cs`、`src/AndroidRuntime.cs` 的 `PrepareAvd()`|
+|稳定性|Emulator/scrcpy 异常退出后的恢复入口|部分完成：状态区显示退出组件与模拟器日志，修复后可重新启动；不自动重连或自动重启|`src/AndroidRuntime.cs` 的 `ObserveExitAsync`、`LastExitReason`；`src/MainWindow.cs`|
 |功能|关闭自动启动手机的选项|待完成|启动流程和主窗口|
 |功能|手机数据一键备份/恢复|待完成|基于现有停机、迁移、不覆盖边界设计；现有 Local 打包不等于 GUI 功能已实现|
 |功能|APK 安装前展示包名、版本和签名摘要|待完成|APK 安装入口；不要为了展示信息先安装待检查 APK|
@@ -127,7 +127,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Check-Environment.ps1 -Jso
 |发布|EXE 和发布校验文件签名|待完成|正式签名证书及安全保管是前置条件；当前 EXE 未作 Authenticode 签名|
 |后续评估|SDK-style/.NET 8 WPF 迁移|未决定|原建议仅为“后续可评估”，未决定迁移，不默认执行|
 
-已批准并完成的只有优先加固中的三项；其余建议仍未批准、未实现。继续时先明确下一轮边界，不要擅自删除建议，也不要声称已批准某个缩减范围。
+已完成的只有优先加固中的三项，以及用户 2026-11-11 同意继续完善后实施的稳定性三项与异常退出提示；其余建议仍未批准、未实现。继续时先明确下一轮边界，不要擅自删除建议，也不要声称已批准某个缩减范围。
 
 ### 相关文件导航
 
@@ -135,6 +135,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Check-Environment.ps1 -Jso
 - `src/SetupWindow.cs`：安装向导。
 - `src/AppPaths.cs`：持久路径及旧目录迁移。
 - `src/AndroidRuntime.cs`：宿主检查、AVD、Android 进程与操作。
+- `src/AvdConfig.cs`：AVD `config.ini` 结构键与用户调优键合并、取值校验。
 - `src/PhoneDisplayHost.cs`：原生视频子窗口集成。
 - `src/MainWindow.cs`、`src/Program.cs`：主 UI 与启动入口。
 - `build.ps1`、`New-PortablePackage.ps1`、`Check-Environment.ps1`：构建、白名单打包和诊断。

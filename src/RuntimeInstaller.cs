@@ -7,6 +7,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -360,7 +361,7 @@ namespace DroidNest
                 throw new InvalidDataException("Refusing non-HTTPS download/redirect: " + address);
         }
 
-        private static async Task<HttpResponseMessage> OpenAsync(string address, string body, CancellationToken token)
+        private static async Task<HttpResponseMessage> OpenAsync(string address, string body, CancellationToken token, long rangeFrom = 0)
         {
             for (int redirect = 0; redirect < 10; redirect++)
             {
@@ -368,6 +369,13 @@ namespace DroidNest
                 using (var request = new HttpRequestMessage(body == null ? HttpMethod.Get : HttpMethod.Post, address))
                 {
                     if (body != null) request.Content = new StringContent(body, Encoding.UTF8, "application/vnd.git-lfs+json");
+                    if (rangeFrom > 0)
+                    {
+                        request.Headers.Range = new RangeHeaderValue(rangeFrom, null);
+                        // A compressed range response would not match the pinned archive bytes.
+                        request.Headers.AcceptEncoding.Clear();
+                        request.Headers.AcceptEncoding.ParseAdd("identity");
+                    }
                     HttpResponseMessage response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false);
                     int status = (int)response.StatusCode;
                     if (status >= 300 && status <= 399)
@@ -459,45 +467,49 @@ namespace DroidNest
             }
             Exception last = null;
             string partial = final + ".partial";
-            for (int attempt = 0; attempt < 3; attempt++)
+            for (int attempt = 0; attempt < 4; attempt++)
             {
+                long resume = ResumeOffset(partial, download.Size);
+                token.ThrowIfCancellationRequested();
+                if (resume == download.Size)
+                {
+                    Report(progress, "正在验证已下载的 " + download.Name);
+                    if (HashFile(partial, download.Algorithm, token) == download.Digest)
+                    {
+                        File.Move(partial, final);
+                        return final;
+                    }
+                    File.Delete(partial);
+                    resume = 0;
+                }
                 try
                 {
                     RuntimeDiskSpace.Require(cache, checked(download.Size + RuntimeDiskSpace.PhoneReserveBytes));
-                    Report(progress, "正在下载 " + download.Name + "（" + (attempt + 1) + "/3）");
+                    Report(progress, resume > 0
+                        ? String.Format(CultureInfo.InvariantCulture, "继续下载 {0}：{1:N1}/{2:N1} MiB（第 {3}/4 次）",
+                            download.Name, resume / 1048576.0, download.Size / 1048576.0, attempt + 1)
+                        : "正在下载 " + download.Name + "（" + (attempt + 1) + "/4）");
                     string url = download.Id == "webview" ? await ResolveWebViewAsync(token).ConfigureAwait(false) : GoogleAddress(download.Url, attempt);
                     using (var deadline = CancellationTokenSource.CreateLinkedTokenSource(token))
                     {
                         deadline.CancelAfter(TimeSpan.FromSeconds(90));
-                        using (HttpResponseMessage response = await OpenAsync(url, null, deadline.Token).ConfigureAwait(false))
+                        using (HttpResponseMessage response = await OpenAsync(url, null, deadline.Token, resume).ConfigureAwait(false))
                         using (deadline.Token.Register(response.Dispose))
                         using (Stream input = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
-                        using (var output = new FileStream(partial, FileMode.Create, FileAccess.Write, FileShare.None, 131072, true))
-                        using (HashAlgorithm hash = download.Algorithm == "SHA256" ? (HashAlgorithm)SHA256.Create() : SHA1.Create())
                         {
-                            if (response.Content.Headers.ContentLength.HasValue && response.Content.Headers.ContentLength.Value != download.Size)
-                                throw new InvalidDataException("Download size differs from authenticated metadata: " + download.Name);
-                            byte[] buffer = new byte[131072];
-                            long total = 0;
-                            var clock = Stopwatch.StartNew();
-                            int count;
-                            while ((count = await input.ReadAsync(buffer, 0, buffer.Length, deadline.Token).ConfigureAwait(false)) != 0)
+                            long start = 0;
+                            if (response.StatusCode == HttpStatusCode.PartialContent)
                             {
-                                deadline.CancelAfter(TimeSpan.FromSeconds(90));
-                                total += count;
-                                if (total > download.Size) throw new InvalidDataException("Download exceeds expected size: " + download.Name);
-                                hash.TransformBlock(buffer, 0, count, buffer, 0);
-                                await output.WriteAsync(buffer, 0, count, deadline.Token).ConfigureAwait(false);
-                                if (clock.ElapsedMilliseconds >= 750)
-                                {
-                                    Report(progress, String.Format(CultureInfo.InvariantCulture, "{0}: {1:N1}/{2:N1} MiB ({3:0}%)", download.Name, total / 1048576.0, download.Size / 1048576.0, total * 100.0 / download.Size));
-                                    clock.Restart();
-                                }
+                                start = ParseContentRange(Header(response, "Content-Range"), resume, download.Size);
                             }
-                            hash.TransformFinalBlock(new byte[0], 0, 0);
-                            if (total != download.Size || Hex(hash.Hash) != download.Digest)
-                                throw new InvalidDataException("Checksum/size verification failed: " + download.Name + ". The file will not be executed.");
-                            output.Flush(true);
+                            else
+                            {
+                                // The origin ignored or refused the range request: restart from an empty file.
+                                if (resume > 0) Report(progress, "服务器不支持续传，重新开始下载 " + download.Name);
+                                if (response.Content.Headers.ContentLength.HasValue && response.Content.Headers.ContentLength.Value != download.Size)
+                                    throw new InvalidDataException("Download size differs from authenticated metadata: " + download.Name);
+                            }
+                            await CopyPartAsync(input, partial, start, download, progress, deadline).ConfigureAwait(false);
                         }
                     }
                     File.Move(partial, final);
@@ -506,13 +518,107 @@ namespace DroidNest
                 catch (Exception ex)
                 {
                     token.ThrowIfCancellationRequested();
-                    if (!(ex is IOException || ex is HttpRequestException || ex is OperationCanceledException || ex is ObjectDisposedException)) throw;
+                    bool retryable = ex is IOException || ex is HttpRequestException ||
+                        ex is OperationCanceledException || ex is ObjectDisposedException;
+                    if (ex is InvalidDataException)
+                    {
+                        // Never keep bytes that failed verification; a corrupt resume gets one clean retry.
+                        if (File.Exists(partial)) File.Delete(partial);
+                        retryable = resume > 0;
+                    }
+                    if (!retryable) throw;
                     last = ex;
                 }
-                finally { if (File.Exists(partial)) File.Delete(partial); }
-                if (attempt < 2) await Task.Delay(1500 * (attempt + 1), token).ConfigureAwait(false);
+                if (attempt < 3) await Task.Delay(1500 * (attempt + 1), token).ConfigureAwait(false);
             }
             throw NetworkError(download.Url, last);
+        }
+
+        private static string Header(HttpResponseMessage response, string name)
+        {
+            IEnumerable<string> values;
+            return response.Content.Headers.TryGetValues(name, out values) ? values.FirstOrDefault() : null;
+        }
+
+        // Guards a resumed transfer: the origin must answer with exactly the missing suffix of the
+        // pinned archive, otherwise the stream is discarded instead of appended.
+        internal static long ParseContentRange(string header, long offset, long expectedSize)
+        {
+            Match match = Regex.Match(header ?? string.Empty, @"^\s*bytes\s+(\d+)-(\d+)/(\d+)\s*$", RegexOptions.IgnoreCase);
+            long start, end, total;
+            if (!match.Success ||
+                !Int64.TryParse(match.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out start) ||
+                !Int64.TryParse(match.Groups[2].Value, NumberStyles.None, CultureInfo.InvariantCulture, out end) ||
+                !Int64.TryParse(match.Groups[3].Value, NumberStyles.None, CultureInfo.InvariantCulture, out total) ||
+                start < 0 || end < start || end >= total || total != expectedSize)
+                throw new InvalidDataException("The server resumed the download at an unexpected range: " + header);
+            if (start != offset || end + 1 != total)
+                throw new InvalidDataException("The server resumed the download at an unexpected range: " + header);
+            return start;
+        }
+
+        internal static long ResumeOffset(string partial, long expectedSize)
+        {
+            if (!File.Exists(partial)) return 0;
+            long length = new FileInfo(partial).Length;
+            if (length < 0 || length > expectedSize)
+            {
+                File.Delete(partial);
+                return 0;
+            }
+            return length;
+        }
+
+        private static async Task CopyPartAsync(Stream input, string partial, long start, RuntimeDownload download,
+            IProgress<string> progress, CancellationTokenSource deadline)
+        {
+            CancellationToken token = deadline.Token;
+            using (HashAlgorithm hash = download.Algorithm == "SHA256" ? (HashAlgorithm)SHA256.Create() : SHA1.Create())
+            {
+                if (start > 0) HashPrefix(partial, hash, start, token);
+                using (var output = new FileStream(partial, start > 0 ? FileMode.Append : FileMode.Create,
+                    FileAccess.Write, FileShare.Read, 131072, true))
+                {
+                    byte[] buffer = new byte[131072];
+                    long total = start;
+                    var clock = Stopwatch.StartNew();
+                    int count;
+                    while ((count = await input.ReadAsync(buffer, 0, buffer.Length, token).ConfigureAwait(false)) != 0)
+                    {
+                        deadline.CancelAfter(TimeSpan.FromSeconds(90));
+                        total += count;
+                        if (total > download.Size) throw new InvalidDataException("Download exceeds expected size: " + download.Name);
+                        hash.TransformBlock(buffer, 0, count, buffer, 0);
+                        await output.WriteAsync(buffer, 0, count, token).ConfigureAwait(false);
+                        if (clock.ElapsedMilliseconds >= 750)
+                        {
+                            Report(progress, String.Format(CultureInfo.InvariantCulture, "{0}: {1:N1}/{2:N1} MiB ({3:0}%)", download.Name, total / 1048576.0, download.Size / 1048576.0, total * 100.0 / download.Size));
+                            clock.Restart();
+                        }
+                    }
+                    hash.TransformFinalBlock(new byte[0], 0, 0);
+                    if (total != download.Size || Hex(hash.Hash) != download.Digest)
+                        throw new InvalidDataException("Checksum/size verification failed: " + download.Name + ". The file will not be executed.");
+                    output.Flush(true);
+                }
+            }
+        }
+
+        private static void HashPrefix(string path, HashAlgorithm hash, long length, CancellationToken token)
+        {
+            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 131072, false))
+            {
+                byte[] buffer = new byte[131072];
+                long remaining = length;
+                while (remaining > 0)
+                {
+                    token.ThrowIfCancellationRequested();
+                    int count = stream.Read(buffer, 0, (int)Math.Min(buffer.Length, remaining));
+                    if (count <= 0) throw new IOException("The partially downloaded file shrank before it could resume: " + path);
+                    hash.TransformBlock(buffer, 0, count, buffer, 0);
+                    remaining -= count;
+                }
+            }
         }
 
         private static async Task ExtractAsync(string archiveFile, string destination, string prefix, CancellationToken token)

@@ -21,6 +21,8 @@ namespace DroidNest
         private const int AdbPort = 5048;
         private const int EmulatorPort = 5580;
         private const string Serial = "emulator-5580";
+        private const int RetainedLogFiles = 16;
+        private const long RetainedLogBytes = 64L * 1024 * 1024;
         private readonly string root;
         private readonly string sdk;
         private readonly string avdHome;
@@ -40,6 +42,8 @@ namespace DroidNest
         private volatile bool ready;
         private volatile bool disposed;
         private string emulatorLog;
+        private string avdGpuMode = AvdConfig.DefaultGpuMode;
+        private string exitReason;
 
         public event Action<string> Log;
 
@@ -72,6 +76,9 @@ namespace DroidNest
                 }
             }
         }
+
+        // Set when a process of the current session exits on its own, so the UI can say what ended.
+        public string LastExitReason { get { lock (stateLock) { return exitReason; } } }
 
         public async Task<string> CheckAsync()
         {
@@ -133,6 +140,12 @@ namespace DroidNest
             RequireFreePort(EmulatorPort + 1);
             string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss-fff", CultureInfo.InvariantCulture);
             Directory.CreateDirectory(logsDirectory);
+            int rotated = TrimLogs(logsDirectory, RetainedLogFiles, RetainedLogBytes, DateTime.UtcNow);
+            if (rotated > 0)
+                Emit("已清理 " + rotated.ToString(CultureInfo.InvariantCulture) + " 个旧日志；保留最近 " +
+                    RetainedLogFiles.ToString(CultureInfo.InvariantCulture) + " 个、最多 " +
+                    (RetainedLogBytes / 1048576).ToString(CultureInfo.InvariantCulture) + " MiB。");
+            lock (stateLock) { exitReason = null; }
             OwnedProcess server = Launch(adbPath, new string[] { "-P", "5048", "nodaemon", "server" },
                 Path.Combine(logsDirectory, "adb-" + stamp + ".log"), "adb");
             lock (stateLock) { adbServer = server; }
@@ -143,7 +156,7 @@ namespace DroidNest
             emulatorLog = Path.Combine(logsDirectory, "emulator-" + stamp + ".log");
             OwnedProcess phone = Launch(emulatorPath, new string[] {
                 "-avd", "DroidNest", "-port", "5580", "-no-snapshot", "-no-boot-anim",
-                "-gpu", "swiftshader", "-accel", "on", "-no-window", "-no-metrics"
+                "-gpu", avdGpuMode, "-accel", "on", "-no-window", "-no-metrics"
             }, emulatorLog, "emulator");
             lock (stateLock) { emulator = phone; }
             Emit("Starting Android 11 in the integrated display. Log: " + emulatorLog);
@@ -542,23 +555,43 @@ namespace DroidNest
             Directory.CreateDirectory(phoneDirectory);
             Directory.CreateDirectory(androidHome);
             // Only configuration is written. Existing userdata, APKs and app storage are never deleted.
-            string config = String.Join("\n", new string[] {
-                "AvdId=DroidNest", "avd.ini.displayname=DroidNest", "avd.ini.encoding=UTF-8",
-                "abi.type=x86_64", "tag.id=default", "tag.display=Default", "target=android-30",
-                "image.sysdir.1=" + imageDirectory.Replace('\\', '/') + "/",
-                "hw.cpu.arch=x86_64", "hw.cpu.ncore=2", "hw.ramSize=2048", "vm.heapSize=256",
-                "disk.dataPartition.size=4G", "hw.lcd.width=720", "hw.lcd.height=1280", "hw.lcd.density=320",
-                "hw.keyboard=yes", "hw.mainKeys=no", "hw.dPad=no", "hw.trackBall=no", "hw.touchScreen=multi-touch",
-                "hw.gpu.enabled=yes", "hw.gpu.mode=swiftshader", "hw.audioInput=yes", "hw.battery=yes",
-                "hw.gps=yes", "hw.accelerometer=yes", "hw.sensors.orientation=yes",
-                "hw.camera.back=emulated", "hw.camera.front=emulated",
-                "hw.sdCard=no", "showDeviceFrame=no", "skin.dynamic=yes", "skin.name=720x1280",
-                "fastboot.forceColdBoot=yes", "fastboot.forceFastBoot=no", "fastboot.chosenSnapshotFile=",
-                "PlayStore.enabled=false", ""
-            });
-            File.WriteAllText(Path.Combine(phoneDirectory, "config.ini"), config, new UTF8Encoding(false));
-            File.WriteAllText(Path.Combine(avdHome, "DroidNest.ini"),
-                "avd.ini.encoding=UTF-8\npath=" + phoneDirectory.Replace('\\', '/') + "\ntarget=android-30\n", new UTF8Encoding(false));
+            // Tuning keys a user edited in config.ini are carried over; structural keys are client-owned.
+            string configPath = Path.Combine(phoneDirectory, "config.ini");
+            string config = AvdConfig.Merge(File.Exists(configPath) ? File.ReadAllText(configPath) : null, imageDirectory);
+            AvdConfig.WriteAtomic(configPath, config);
+            avdGpuMode = AvdConfig.GpuMode(config);
+            AvdConfig.WriteAtomic(Path.Combine(avdHome, "DroidNest.ini"),
+                "avd.ini.encoding=UTF-8\npath=" + phoneDirectory.Replace('\\', '/') + "\ntarget=android-30\n");
+        }
+
+        // Old sessions keep one log per process. Rotation runs before a new session creates its logs,
+        // never deletes a log that is still being written, and ignores files it cannot delete.
+        internal static int TrimLogs(string directory, int keepFiles, long keepBytes, DateTime nowUtc)
+        {
+            FileInfo[] files;
+            try { files = new DirectoryInfo(directory).GetFiles("*.log"); }
+            catch (IOException) { return 0; }
+            catch (UnauthorizedAccessException) { return 0; }
+            Array.Sort(files, delegate(FileInfo left, FileInfo right) { return left.LastWriteTimeUtc.CompareTo(right.LastWriteTimeUtc); });
+            long total = 0;
+            foreach (FileInfo file in files) total += file.Length;
+            int remaining = files.Length;
+            int deleted = 0;
+            foreach (FileInfo file in files)
+            {
+                if (remaining <= keepFiles && total <= keepBytes) break;
+                if (nowUtc - file.LastWriteTimeUtc < TimeSpan.FromMinutes(10)) continue;
+                try
+                {
+                    file.Delete();
+                    remaining--;
+                    total -= file.Length;
+                    deleted++;
+                }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+            }
+            return deleted;
         }
 
         private IDictionary<string, string> ProcessEnvironment()
@@ -713,7 +746,12 @@ namespace DroidNest
                     try
                     {
                         lock (stateLock) { if (emulator != phone || adbServer != server) return; }
-                        Emit("Android or its video connection closed. Stopping the owned phone; start it again to reconnect.");
+                        string reason = phone.HasExited
+                            ? (server.HasExited ? "Android 模拟器和私有 ADB 服务已退出" : "Android 模拟器已退出（代码 " + phone.ExitCode.ToString(CultureInfo.InvariantCulture) + "）")
+                            : (server.HasExited ? "私有 ADB 服务已退出（代码 " + server.ExitCode.ToString(CultureInfo.InvariantCulture) + "）" : "手机画面进程已退出");
+                        string log = emulatorLog ?? Path.Combine(logsDirectory, "emulator-*.log");
+                        lock (stateLock) { exitReason = reason + "。日志：" + log; }
+                        Emit(reason + "。Stopping only the phone this session started; data is kept.");
                         await StopCoreAsync(false).ConfigureAwait(false);
                     }
                     finally { operations.Release(); }
