@@ -124,7 +124,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Check-Environment.ps1 -Jso
 |功能|手机数据一键备份/恢复|已完成：ZIP + SHA-256，恢复前校验，拒绝覆盖/合并和穿越/链接条目|`src/PhoneBackup.cs`、主界面“备份/恢复手机数据”|
 |功能|APK 安装前展示包名、版本和签名摘要|已完成：aapt2 读取包名/版本，apksigner 或 v1 证书读取 SHA-256，确认后才安装|`src/ApkInspector.cs`；缺少工具时提示，不代替用户决定|
 |功能|运行时修复、更新检查、版本迁移提示|部分完成：启动时 `DescribeHealth` 识别旧记录、版本漂移、缺 Build Tools，并提供“修复运行环境…”；没有联网检查新版本|`RuntimeInstaller.DescribeHealth`、`SetupWindow` 修复模式|
-|发布|EXE 和发布校验文件签名|受阻：本机没有代码签名证书；已提供 `Sign-Release.ps1`，无证书时失败，不生成自签名替代|正式证书与安全保管是前置条件；签名未执行|
+|发布|EXE 和发布校验文件签名|受阻：本机没有代码签名证书，且未安装 Windows SDK 的 signtool；`Sign-Release.ps1` 已支持可导出 PFX（交互式密码）与证书存储/令牌两种模式，失败时不生成自签名替代|正式证书与安全保管是前置条件；用户已选择 PFX 模式，等待提供本机路径|
 |后续评估|SDK-style/.NET 8 WPF 迁移|未决定|原建议仅为“后续可评估”，未决定迁移，不默认执行|
 
 已完成的：优先加固三项、稳定性四项、功能四项（运行时更新检查只覆盖本地记录/版本一致性，不含联网检查）。仍受阻：三个组件可信 SHA-256、正式发布签名。其余建议（自动检查更新、.NET 8 迁移）未实现。

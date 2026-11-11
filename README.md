@@ -87,7 +87,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\New-PortablePackage.ps1 -V
 
 主界面“修复运行环境…”会在保留手机数据的前提下重新准备运行时：旧运行时移动到 `runtime.previous-<id>`，不动 `data`。启动时若发现安装记录格式过旧、模拟器/Platform Tools 版本与客户端固定版本不一致，或缺少 Build Tools，会显示修复提示；修复后需重新打开客户端。
 
-发布 EXE 的 Authenticode 签名需要你自己的代码签名证书。仓库提供 `Sign-Release.ps1 -PfxPath <pfx> -PfxPassword <password>`，没有证书时脚本直接失败，不会生成自签名证书冒充发布签名。签名后仍需人工核对证书主题与时间戳；SHA-256 校验文件只证明完整性，不等于发布者签名。
+发布 EXE 的 Authenticode 签名需要你自己的代码签名证书。2023 年 6 月后签发的 OV/EV 代码签名证书通常把私钥放在硬件令牌或 HSM 中，不能导出 PFX；这种情况下用证书存储模式，私钥不会离开令牌：
+
+```powershell
+# 可导出的 PFX；省略 -PfxPassword 时会交互式输入，不写入命令历史
+.\Sign-Release.ps1 -PfxPath D:\secure\DroidNest.pfx
+
+# 已通过厂商工具导入的证书（硬件令牌 / HSM）
+.\Sign-Release.ps1 -CertificateThumbprint <40位SHA1指纹> -StoreLocation CurrentUser
+```
+
+`Sign-Release.ps1` 只会使用你提供的真实证书，缺少证书或签名验证失败时直接报错，不会生成自签名证书冒充发布签名。云签名服务（如 Azure Trusted Signing）需要按其 `dlib` 流程另行调用，不能直接套用本脚本。签名后仍需人工核对证书主题与时间戳；SHA-256 校验文件只证明完整性，不等于发布者签名。
 
 迁移自己的已安装环境：正常关闭全部 DroidNest，再运行：
 
