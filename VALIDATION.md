@@ -2,7 +2,9 @@
 
 ## 干净 Windows 自动化验收
 
-工作流：`.github/workflows/windows.yml`，使用 `windows-2022`、Windows PowerShell 5.1 和系统 .NET Framework 编译器。触发条件为 push、pull request 或手动运行。这里只描述提交的检查和验收标准，**不表示这些检查已在 GitHub 远程运行或通过**；以对应提交的 Actions 结果为准。
+工作流：`.github/workflows/windows.yml`，使用 `windows-2022`、Windows PowerShell 5.1 和系统 .NET Framework 编译器。触发条件为 push、pull request 或手动运行。这里只描述提交的检查和验收标准，**不表示任意提交的这些检查已在 GitHub 远程运行或通过**；以对应提交的 Actions 结果为准。
+
+提交 `1a6c2e3` 的远程运行 `43054551399`（2026-11-11，`windows-2022`，job 24 秒）已通过全部五个步骤。该结果只覆盖构建、打包和离线边界脚本，不代表 GUI、WHPX 或真实手机验收。
 
 | 项目 | 自动化入口 | 通过标准与边界 |
 | --- | --- | --- |
