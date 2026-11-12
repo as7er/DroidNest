@@ -77,7 +77,8 @@
 
 - 诊断模式 `Check-Environment.ps1 -Json` 曾在本机报 `disk:` 失败：`类型“System.Management.Automation.PSObject”的对象无法转换为类型“System.String”`。根因是该脚本把 `Join-Path` 的结果直接传给 `MethodInfo.Invoke`；Windows PowerShell 5.1 不会自动解包 `PSObject`。改为显式 `[string]` 转换，与 `tests/` 现有反射调用写法一致。
 - 复核：`disk:` 从 fail 变为 pass（105.0 GiB 可用）；停止外部 `F:\FMMV` 的 adb server 后，5048/5580/5581 均可用。该 adb 由其他项目启动，DroidNest 按设计不停止外部进程。
-- `tests/client-features.ps1` 新增预检回归：在无安装记录的机器上执行 `-Json` 并拒绝 `PSObject`/无法确认磁盘空间误报；临时还原修复时该回归失败，恢复后通过。CI 会覆盖无运行时路径。
+- `tests/client-features.ps1` 新增预检回归：在无安装记录的机器上执行 `-Json` 并拒绝 `PSObject`/无法确认磁盘空间误报；临时还原修复时该回归失败，恢复后通过。
+- 首次远程运行暴露 GitHub Actions 的 PowerShell 包装器会把嵌套诊断的预期退出码 1 当作步骤失败；回归在捕获退出码后清零 `$LASTEXITCODE`。提交 `5e91423` 的远程运行 `43150103463` 已通过全部七个步骤，覆盖无运行时路径。
 - 边界：该修复只影响诊断模式，不改变安装、运行时或手机数据路径；已发布的 v0.3.0 ZIP 未包含此修复，下次打包才会带上。
 
 ## 必须单独执行的 Windows 手动验收
