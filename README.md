@@ -2,17 +2,17 @@
 
 运行在 Windows 上的无广告 Android 桌面客户端。手机画面和控制面板在同一个窗口中，支持鼠标触摸、键盘输入、APK 安装、横竖屏与全屏。
 
-**v0.2.0：下载客户端 ZIP，首次打开后由图形向导在线安装运行时，无需自己准备 SDK、JDK 或运行组件准备脚本。** 公开 ZIP 仍不捆绑第三方运行时，也不是离线完整模拟器；单独下载 EXE 不足以完成首次安装。
+**v0.3.0：下载客户端 ZIP，首次打开后由图形向导在线安装运行时，无需自己准备 SDK、JDK 或运行组件准备脚本。** 公开 ZIP 仍不捆绑第三方运行时，也不是离线完整模拟器；单独下载 EXE 不足以完成首次安装。
 
 ## 下载与首次启动
 
 仓库：<https://github.com/as7er/DroidNest>
 
-1. 下载 `DroidNest-v0.2.0-win-x64-client.zip`，核对发布页的 SHA-256，完整解压（不要在 ZIP 内直接运行）。保留 `tools/SignWebView.java` 等随包文件。
+1. 下载 `DroidNest-v0.3.0-win-x64-client.zip`，核对发布页的 SHA-256，完整解压（不要在 ZIP 内直接运行）。保留 `tools/SignWebView.java` 等随包文件。
 2. 双击 `Start-DroidNest.cmd`。启动器检查 Windows/x64、.NET 和客户端文件；**不会因为尚未安装 Android 运行时而拒绝打开向导**。
 3. 向导先检查安装所需的宿主条件。WHPX 未启用时会说明原因并提供打开“Windows 功能”的按钮；先按提示启用并重启，条件满足后才读取在线元数据，不会先下载组件。随后显示组件、版本、来源、实际下载大小、条款/许可链接及公开测试密钥风险。阅读后明确勾选同意，才开始下载、解压及本地准备；取消或不接受不会开始组件安装。
 4. 保持网络连接并观察进度。向导自动获取 Android Emulator、Platform Tools、Android 11 / API 30 `default;x86_64` 镜像、scrcpy 和 WebView，以及仅供本地准备使用的私有 JDK 与 Android Build Tools；无需修改系统 Java/SDK 配置。下载失败时按界面提示重试；关闭后可重新打开客户端继续安装流程。不要为了重试删除手机数据目录。
-5. 安装完成后进入主界面并自动启动已准备的手机；以后打开客户端也会自动启动手机。首次冷启动需要等待 Android 就绪，手动停止后可点击“启动手机”重新启动。
+5. 安装完成后进入主界面并自动启动已准备的手机；以后打开客户端默认也会自动启动手机，可在右侧关闭“打开客户端时自动启动手机”。首次冷启动需要等待 Android 就绪，手动停止后可点击“启动手机”重新启动。
 
 客户端不会静默代替用户接受组件条款，不会自动提权、关闭安全防护或更改虚拟化功能。网络代理、企业防火墙或上游不可用可能导致元数据/下载失败；保留错误信息排查，不要绕过 HTTPS 证书校验。
 
@@ -80,7 +80,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Check-Environment.ps1 -Jso
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\New-PortablePackage.ps1 -Version 0.2.0
+powershell -NoProfile -ExecutionPolicy Bypass -File .\New-PortablePackage.ps1 -Version 0.3.0
 ```
 
 `dist/` 产物采用客户端文件白名单，包含 EXE、配置、启动与诊断脚本、`tools/SignWebView.java`、`Sign-Release.ps1`、许可和说明；**不包含运行时、私有准备工具、下载缓存、手机数据、日志或密钥**。附带 SHA-256 校验文件，拒绝覆盖同名产物。旧版 `Setup-Components.ps1` 和 `Import-LocalRuntime.ps1` 已移除，安装由客户端完成。
@@ -115,7 +115,7 @@ Local 模式从 `%LOCALAPPDATA%\DroidNest` 读取已安装运行时，若有安�
 
 不要把运行时、数据、日志、下载缓存、验证截图、打包产物或密钥材料强制添加到版本控制。
 
-仓库中的 `runtime-origin.json` 仅保留早期开发环境来源记录，不作为 v0.2.0 安装依据，也不进入公开客户端 ZIP。在线安装以官方元数据为准：API 30 镜像选择官方 revision 11；旧本机镜像的 package.xml revision 11 与 source.properties revision 10 不一致，不能据此推断在线安装版本。
+仓库中的 `runtime-origin.json` 仅保留早期开发环境来源记录，不作为当前版本安装依据，也不进入公开客户端 ZIP。在线安装以官方元数据为准：API 30 镜像选择官方 revision 11；旧本机镜像的 package.xml revision 11 与 source.properties revision 10 不一致，不能据此推断在线安装版本。
 
 ## 安全边界与验证状态
 
@@ -124,6 +124,8 @@ Android 镜像使用**公开 AOSP 测试证书**。向导使用匹配的公开�
 下载校验信任边界：Platform Tools 37.0.1 已固定独立发布的 SHA-256（[scrcpy v5.0.1 的上游记录](https://github.com/Genymobile/scrcpy/blob/v5.0.1/app/deps/adb_windows.sh)），在线元数据不能覆盖该值。Emulator 37.2.13、Build Tools 35.0.0 和 API 30 revision 11 镜像目前仍使用 Google HTTPS 元数据中的 SHA-1，**尚未完成这三个组件的可信 SHA-256 固定**；不把同一次下载自行计算的摘要当作信任锚。其余既有 SHA-256 固定保持不变。
 
 v0.2.0 已在本机 Windows 10 x64 上完成独立客户端目录的在线组件准备，确认 Android 桌面持续显示、WebView 156 生效，以及系统设置、横竖屏、全屏和最小化恢复。另已验证写入 Android 文件后立即正常关闭，再从含中文和空格的新客户端目录启动，文件仍在且运行时安装记录不变。迁移原件保留、目标数据不覆盖、取消与解压路径边界检查通过。详见 [验证记录](VALIDATION.md)。
+
+v0.3.0 另外验证了：下载断点续传（真实 206 响应）、日志轮换、AVD 调优值保留并生效、终止 scrcpy 后自动重连且 Android 不重启、真实 APK 安装前读取包名/版本/证书、615.5 MiB 手机数据备份恢复后再次启动、7 步远程 Windows CI。仍未完成干净 Windows 环境、全新 format 2 安装后的端到端验收和不同硬件覆盖。
 
 **这些结果来自现有开发电脑，不等于干净 Windows 机器验收；独立 Windows 用户/虚拟机首次安装和不同硬件仍待验证。** 旧版的 APK 安装、FMMV 主菜单和球队选择、鼠标/键盘测试属于历史记录，不保证所有应用兼容或完整游戏流程。
 

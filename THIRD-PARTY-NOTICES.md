@@ -6,7 +6,7 @@ The MIT license in this repository covers DroidNest's original client code, scri
 
 Public client ZIPs contain the DroidNest executable, configuration, launcher/diagnostic/packaging scripts, the Java signing-helper **source**, and documentation. They do **not** contain Android images, SDK binaries, scrcpy binaries, WebView APKs, JDK binaries, phone data, ADB keys, signing keys, caches, or logs. A lone executable is not a complete first-run distribution.
 
-The v0.2.0 client fetches upstream metadata to prepare an installation plan before component installation. The plan presents versions, sizes, origins, Android repository license text, and readable upstream license URLs. Explicit user consent is required before downloading/installing the runtime. Installation is for local use; neither consent, source URLs, checksums, nor a local installation receipt confer redistribution rights. Preserve upstream NOTICE/license files and review applicable agreements and open-source exceptions.
+The DroidNest client fetches upstream metadata to prepare an installation plan before component installation. The plan presents versions, sizes, origins, Android repository license text, and readable upstream license URLs. Explicit user consent is required before downloading/installing the runtime. Installation is for local use; neither consent, source URLs, checksums, nor a local installation receipt confer redistribution rights. Preserve upstream NOTICE/license files and review applicable agreements and open-source exceptions.
 
 ## Android SDK, emulator, and API 30 image
 

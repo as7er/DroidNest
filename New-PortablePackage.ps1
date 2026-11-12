@@ -15,7 +15,7 @@ ZIP entries are rooted directly at the extraction directory. Existing outputs
 are never overwritten. .NET ZipArchive streams files and supports ZIP64, unlike
 Compress-Archive's large-file limitation. No build or download is performed.
 .EXAMPLE
-.\New-PortablePackage.ps1 -Version 0.2.0
+.\New-PortablePackage.ps1 -Version 0.3.0
 .EXAMPLE
 .\New-PortablePackage.ps1 -Mode Local -IncludeData
 #>
@@ -23,7 +23,7 @@ Compress-Archive's large-file limitation. No build or download is performed.
 param(
     [ValidateLength(5, 64)]
     [ValidatePattern('^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$')]
-    [string]$Version = '0.2.0',
+    [string]$Version = '0.3.0',
 
     [ValidateSet('Client', 'Local')]
     [string]$Mode = 'Client',

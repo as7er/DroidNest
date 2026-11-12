@@ -93,7 +93,7 @@ foreach ($relative in @('DroidNest.exe', 'DroidNest.exe.config', 'tools\SignWebV
         $file = Get-Item -LiteralPath (Join-Path $appRoot $relative) -ErrorAction Stop
         if ($file.PSIsContainer -or $file.Length -eq 0) { throw '不是有效的非空文件。' }
         Add-Check ('app:' + $relative) 'pass' ('客户端文件存在：' + $relative)
-    } catch { Add-Check ('app:' + $relative) 'fail' ('客户端文件缺失或为空：' + $relative + '。请重新完整解压 v0.2.0 客户端 ZIP，不要只下载 EXE。') }
+    } catch { Add-Check ('app:' + $relative) 'fail' ('客户端文件缺失或为空：' + $relative + '。请重新完整解压 v0.3.0 客户端 ZIP，不要只下载 EXE。') }
 }
 
 if (-not $Launch) {

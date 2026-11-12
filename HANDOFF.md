@@ -1,73 +1,73 @@
-# DroidNest 换机交接
+﻿# DroidNest 鎹㈡満浜ゆ帴
 
-交接日期：2026-11-11。用途：换电脑后恢复开发上下文；本次只做交接，不实施优化、不打包私人手机数据。
+浜ゆ帴鏃ユ湡锛?026-11-11銆傜敤閫旓細鎹㈢數鑴戝悗鎭㈠寮€鍙戜笂涓嬫枃锛涙湰娆″彧鍋氫氦鎺ワ紝涓嶅疄鏂戒紭鍖栥€佷笉鎵撳寘绉佷汉鎵嬫満鏁版嵁銆?
 
-## 1. 当前状态与任务来源
+## 1. 褰撳墠鐘舵€佷笌浠诲姟鏉ユ簮
 
-- 仓库：<https://github.com/as7er/DroidNest>
-- 当前电脑工作目录：`F:\DroidNest`。新电脑可以使用其他目录。
-- 当前基线：`main` 提交 `98b65a5`（功能加固）与后续文档提交；远程 Actions 运行 `43071887237` 通过全部七个步骤。第 4 节状态列反映这些提交。
-- 最初交接时（2026-11-11 12:00 前后）提交为 `d82f2134eb22f3f00621a051e8611706479e316f`（`Release v0.2.0 with guided runtime installation and persistent phone data`），当时没有未提交优化。
-- Codex 先完成检查和建议，用户回复“可以，按你建议继续”后服务报错。后续会话已完成优先加固三项（安装记录 SHA-256、动态磁盘预算、Windows CI 与离线边界测试）、稳定性四项（下载续传、日志轮换、AVD 调优保留、退出恢复）和功能四项（自动启动开关、数据备份/恢复、APK 信息、本地运行时健康/修复），并推送通过远程 Actions。
-- 用户询问 EXE 何时发布；结论是继续完善后再发布：三个 Android 组件仍缺已核验的独立 SHA-256，正式签名证书也未提供；真实 Android 启动已用现有运行时验证，全新 format 2 安装后的端到端验收仍未执行。
+- 浠撳簱锛?https://github.com/as7er/DroidNest>
+- 褰撳墠鐢佃剳宸ヤ綔鐩綍锛歚F:\DroidNest`銆傛柊鐢佃剳鍙互浣跨敤鍏朵粬鐩綍銆?
+- 褰撳墠鍩虹嚎锛歚main` 鎻愪氦 `98b65a5`锛堝姛鑳藉姞鍥猴級涓庡悗缁枃妗ｆ彁浜わ紱杩滅▼ Actions 杩愯 `43071887237` 閫氳繃鍏ㄩ儴涓冧釜姝ラ銆傜 4 鑺傜姸鎬佸垪鍙嶆槧杩欎簺鎻愪氦銆?
+- 鏈€鍒濅氦鎺ユ椂锛?026-11-11 12:00 鍓嶅悗锛夋彁浜や负 `d82f2134eb22f3f00621a051e8611706479e316f`锛坄Release v0.2.0 with guided runtime installation and persistent phone data`锛夛紝褰撴椂娌℃湁鏈彁浜や紭鍖栥€?
+- Codex 鍏堝畬鎴愭鏌ュ拰寤鸿锛岀敤鎴峰洖澶嶁€滃彲浠ワ紝鎸変綘寤鸿缁х画鈥濆悗鏈嶅姟鎶ラ敊銆傚悗缁細璇濆凡瀹屾垚浼樺厛鍔犲浐涓夐」锛堝畨瑁呰褰?SHA-256銆佸姩鎬佺鐩橀绠椼€乄indows CI 涓庣绾胯竟鐣屾祴璇曪級銆佺ǔ瀹氭€у洓椤癸紙涓嬭浇缁紶銆佹棩蹇楄疆鎹€丄VD 璋冧紭淇濈暀銆侀€€鍑烘仮澶嶏級鍜屽姛鑳藉洓椤癸紙鑷姩鍚姩寮€鍏炽€佹暟鎹浠?鎭㈠銆丄PK 淇℃伅銆佹湰鍦拌繍琛屾椂鍋ュ悍/淇锛夛紝骞舵帹閫侀€氳繃杩滅▼ Actions銆?
+- 鐢ㄦ埛璇㈤棶 EXE 浣曟椂鍙戝竷锛涚粨璁烘槸缁х画瀹屽杽鍚庡啀鍙戝竷锛氫笁涓?Android 缁勪欢浠嶇己宸叉牳楠岀殑鐙珛 SHA-256锛屾寮忕鍚嶈瘉涔︿篃鏈彁渚涳紱鐪熷疄 Android 鍚姩宸茬敤鐜版湁杩愯鏃堕獙璇侊紝鍏ㄦ柊 format 2 瀹夎鍚庣殑绔埌绔獙鏀朵粛鏈墽琛屻€?
 
-### 历史验证与本次核对的区别
+### 鍘嗗彶楠岃瘉涓庢湰娆℃牳瀵圭殑鍖哄埆
 
-|来源|结果|边界|
+|鏉ユ簮|缁撴灉|杈圭晫|
 |---|---|---|
-|前次 Codex 记录|`build.ps1` 成功，产物 `F:\DroidNest\DroidNest.exe`|本次交接未重新构建|
-|前次 Codex 记录|`New-PortablePackage.ps1` PowerShell 语法解析通过|不代表实际生成过安装包|
-|仓库 `VALIDATION.md`|本机在线安装、桌面持续显示、窗口操作、换目录及数据保留、迁移与解压边界验证|是版本已有记录，不是本次执行；不是干净 Windows 验收|
-|本次交接|读取当前提交、工作区状态、README、构建和迁移打包脚本|未启动 Android，未进行新机验收，未生成手机备份|
+|鍓嶆 Codex 璁板綍|`build.ps1` 鎴愬姛锛屼骇鐗?`F:\DroidNest\DroidNest.exe`|鏈浜ゆ帴鏈噸鏂版瀯寤簗
+|鍓嶆 Codex 璁板綍|`New-PortablePackage.ps1` PowerShell 璇硶瑙ｆ瀽閫氳繃|涓嶄唬琛ㄥ疄闄呯敓鎴愯繃瀹夎鍖厊
+|浠撳簱 `VALIDATION.md`|鏈満鍦ㄧ嚎瀹夎銆佹闈㈡寔缁樉绀恒€佺獥鍙ｆ搷浣溿€佹崲鐩綍鍙婃暟鎹繚鐣欍€佽縼绉讳笌瑙ｅ帇杈圭晫楠岃瘉|鏄増鏈凡鏈夎褰曪紝涓嶆槸鏈鎵ц锛涗笉鏄共鍑€ Windows 楠屾敹|
+|鏈浜ゆ帴|璇诲彇褰撳墠鎻愪氦銆佸伐浣滃尯鐘舵€併€丷EADME銆佹瀯寤哄拰杩佺Щ鎵撳寘鑴氭湰|鏈惎鍔?Android锛屾湭杩涜鏂版満楠屾敹锛屾湭鐢熸垚鎵嬫満澶囦唤|
 
-此前还有一次已经完成的桌面 v0.1.0 客户端环境修复；它不是本次待续接的开发任务。旧版手机数据可能位于旧 EXE 相邻的 `data`，不能只复制 Git 仓库就认为手机已备份。
+姝ゅ墠杩樻湁涓€娆″凡缁忓畬鎴愮殑妗岄潰 v0.1.0 瀹㈡埛绔幆澧冧慨澶嶏紱瀹冧笉鏄湰娆″緟缁帴鐨勫紑鍙戜换鍔°€傛棫鐗堟墜鏈烘暟鎹彲鑳戒綅浜庢棫 EXE 鐩搁偦鐨?`data`锛屼笉鑳藉彧澶嶅埗 Git 浠撳簱灏辫涓烘墜鏈哄凡澶囦唤銆?
 
-## 2. 换机前要带走什么
+## 2. 鎹㈡満鍓嶈甯﹁蛋浠€涔?
 
-### 只继续开发
+### 鍙户缁紑鍙?
 
-1. 保存本文件。它目前仅存在于本机；单独在新电脑 `git clone` **不会自动带上未提交、未推送的交接文件**。
-2. 推荐将本文件单独复制到新电脑的仓库根目录；也可以自行审核后提交并推送。此次没有替用户执行提交或推送。
-3. 源码通过 Git 获取即可。无需复制旧电脑的 `.codex`、模型认证、访问令牌或整个用户目录。本文件已整理恢复任务所需上下文。
+1. 淇濆瓨鏈枃浠躲€傚畠鐩墠浠呭瓨鍦ㄤ簬鏈満锛涘崟鐙湪鏂扮數鑴?`git clone` **涓嶄細鑷姩甯︿笂鏈彁浜ゃ€佹湭鎺ㄩ€佺殑浜ゆ帴鏂囦欢**銆?
+2. 鎺ㄨ崘灏嗘湰鏂囦欢鍗曠嫭澶嶅埗鍒版柊鐢佃剳鐨勪粨搴撴牴鐩綍锛涗篃鍙互鑷瀹℃牳鍚庢彁浜ゅ苟鎺ㄩ€併€傛娆℃病鏈夋浛鐢ㄦ埛鎵ц鎻愪氦鎴栨帹閫併€?
+3. 婧愮爜閫氳繃 Git 鑾峰彇鍗冲彲銆傛棤闇€澶嶅埗鏃х數鑴戠殑 `.codex`銆佹ā鍨嬭璇併€佽闂护鐗屾垨鏁翠釜鐢ㄦ埛鐩綍銆傛湰鏂囦欢宸叉暣鐞嗘仮澶嶄换鍔℃墍闇€涓婁笅鏂囥€?
 
-### 还要保留当前 Android 手机
+### 杩樿淇濈暀褰撳墠 Android 鎵嬫満
 
-源码仓库和手机状态是两份独立资料。v0.2.0 当前 Windows 用户的状态路径为：
+婧愮爜浠撳簱鍜屾墜鏈虹姸鎬佹槸涓や唤鐙珛璧勬枡銆倂0.2.0 褰撳墠 Windows 鐢ㄦ埛鐨勭姸鎬佽矾寰勪负锛?
 
 ```text
 %LOCALAPPDATA%\DroidNest\
-  runtime\   Android、scrcpy、本地 WebView、可选 installation.json
-  data\      手机虚拟磁盘、应用、Android 用户配置
-  logs\      诊断日志
+  runtime\   Android銆乻crcpy銆佹湰鍦?WebView銆佸彲閫?installation.json
+  data\      鎵嬫満铏氭嫙纾佺洏銆佸簲鐢ㄣ€丄ndroid 鐢ㄦ埛閰嶇疆
+  logs\      璇婃柇鏃ュ織
 ```
 
-- 先正常关闭全部 DroidNest，等待手机和视频进程退出；不要强杀后立即复制虚拟磁盘，不要打包期间重新启动。
-- 如果正在使用旧版 EXE 旁的 `runtime`/`data`，先依 README 的旧版迁移流程确认需要保留的是哪部手机。下面的 Local 打包脚本读取的是 `%LOCALAPPDATA%\DroidNest`，**不会自动寻找桌面旧版数据**。
-- 在仓库根目录用 Windows PowerShell 执行以下命令。第一条构建客户端；第二条明确包含手机数据：
+- 鍏堟甯稿叧闂叏閮?DroidNest锛岀瓑寰呮墜鏈哄拰瑙嗛杩涚▼閫€鍑猴紱涓嶈寮烘潃鍚庣珛鍗冲鍒惰櫄鎷熺鐩橈紝涓嶈鎵撳寘鏈熼棿閲嶆柊鍚姩銆?
+- 濡傛灉姝ｅ湪浣跨敤鏃х増 EXE 鏃佺殑 `runtime`/`data`锛屽厛渚?README 鐨勬棫鐗堣縼绉绘祦绋嬬‘璁ら渶瑕佷繚鐣欑殑鏄摢閮ㄦ墜鏈恒€備笅闈㈢殑 Local 鎵撳寘鑴氭湰璇诲彇鐨勬槸 `%LOCALAPPDATA%\DroidNest`锛?*涓嶄細鑷姩瀵绘壘妗岄潰鏃х増鏁版嵁**銆?
+- 鍦ㄤ粨搴撴牴鐩綍鐢?Windows PowerShell 鎵ц浠ヤ笅鍛戒护銆傜涓€鏉℃瀯寤哄鎴风锛涚浜屾潯鏄庣‘鍖呭惈鎵嬫満鏁版嵁锛?
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\New-PortablePackage.ps1 -Mode Local -IncludeData
 ```
 
-输出文件：
+杈撳嚭鏂囦欢锛?
 
 ```text
-dist\DroidNest-v0.2.0-win-x64-LOCAL-ONLY-with-data.zip
-dist\DroidNest-v0.2.0-win-x64-LOCAL-ONLY-with-data-SHA256SUMS.txt
+dist\DroidNest-v0.3.0-win-x64-LOCAL-ONLY-with-data.zip
+dist\DroidNest-v0.3.0-win-x64-LOCAL-ONLY-with-data-SHA256SUMS.txt
 ```
 
-- 只迁移运行时、不保留应用和手机内容时，去掉 `-IncludeData`；文件名也不再有 `-with-data`。
-- 脚本不下载运行时；组件缺失、无法确认已停止、存在占用锁或输出同名文件时会拒绝打包。不要绕过锁检查或随意删除数据。已有同名包应先移到独立备份位置。
-- 将 ZIP 和校验文件一起通过可信私人介质传输。含数据包可能有账号、凭据、Android 身份和 ADB 密钥；不能上传公开仓库或 GitHub Release。校验值不等于发布者签名，校验文件本身也应可信。
-- Local 包不包含开发源码或本交接文件；开发资料仍按上一节另行转移。日志、缓存、私有准备工具和签名材料也不属于该包的完整备份承诺。
-- 新机确认应用和重要数据完整之前，不删除旧机原件和备份。
+- 鍙縼绉昏繍琛屾椂銆佷笉淇濈暀搴旂敤鍜屾墜鏈哄唴瀹规椂锛屽幓鎺?`-IncludeData`锛涙枃浠跺悕涔熶笉鍐嶆湁 `-with-data`銆?
+- 鑴氭湰涓嶄笅杞借繍琛屾椂锛涚粍浠剁己澶便€佹棤娉曠‘璁ゅ凡鍋滄銆佸瓨鍦ㄥ崰鐢ㄩ攣鎴栬緭鍑哄悓鍚嶆枃浠舵椂浼氭嫆缁濇墦鍖呫€備笉瑕佺粫杩囬攣妫€鏌ユ垨闅忔剰鍒犻櫎鏁版嵁銆傚凡鏈夊悓鍚嶅寘搴斿厛绉诲埌鐙珛澶囦唤浣嶇疆銆?
+- 灏?ZIP 鍜屾牎楠屾枃浠朵竴璧烽€氳繃鍙俊绉佷汉浠嬭川浼犺緭銆傚惈鏁版嵁鍖呭彲鑳芥湁璐﹀彿銆佸嚟鎹€丄ndroid 韬唤鍜?ADB 瀵嗛挜锛涗笉鑳戒笂浼犲叕寮€浠撳簱鎴?GitHub Release銆傛牎楠屽€间笉绛変簬鍙戝竷鑰呯鍚嶏紝鏍￠獙鏂囦欢鏈韩涔熷簲鍙俊銆?
+- Local 鍖呬笉鍖呭惈寮€鍙戞簮鐮佹垨鏈氦鎺ユ枃浠讹紱寮€鍙戣祫鏂欎粛鎸変笂涓€鑺傚彟琛岃浆绉汇€傛棩蹇椼€佺紦瀛樸€佺鏈夊噯澶囧伐鍏峰拰绛惧悕鏉愭枡涔熶笉灞炰簬璇ュ寘鐨勫畬鏁村浠芥壙璇恒€?
+- 鏂版満纭搴旂敤鍜岄噸瑕佹暟鎹畬鏁翠箣鍓嶏紝涓嶅垹闄ゆ棫鏈哄師浠跺拰澶囦唤銆?
 
-## 3. 新电脑恢复开发
+## 3. 鏂扮數鑴戞仮澶嶅紑鍙?
 
-需要 Windows 10/11 x64、Git、Windows PowerShell 5.1、.NET Framework 4.8。构建使用系统 Framework 编译器，代码为 C# 5/WPF，不依赖 NuGet，也不要求系统 JDK。
+闇€瑕?Windows 10/11 x64銆丟it銆乄indows PowerShell 5.1銆?NET Framework 4.8銆傛瀯寤轰娇鐢ㄧ郴缁?Framework 缂栬瘧鍣紝浠ｇ爜涓?C# 5/WPF锛屼笉渚濊禆 NuGet锛屼篃涓嶈姹傜郴缁?JDK銆?
 
-在你选择的父目录执行：
+鍦ㄤ綘閫夋嫨鐨勭埗鐩綍鎵ц锛?
 
 ```powershell
 git clone https://github.com/as7er/DroidNest.git
@@ -76,82 +76,82 @@ git log -1 --format="%H %s"
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
-把带来的 `HANDOFF.md` 放到仓库根目录。上面的 clone 获取远端当前默认分支，可能比本交接提交更新；如有新提交，先阅读变化，不要为了匹配本文件而强制重置工作区。需要研究旧基线时使用上面的完整提交 ID。
+鎶婂甫鏉ョ殑 `HANDOFF.md` 鏀惧埌浠撳簱鏍圭洰褰曘€備笂闈㈢殑 clone 鑾峰彇杩滅褰撳墠榛樿鍒嗘敮锛屽彲鑳芥瘮鏈氦鎺ユ彁浜ゆ洿鏂帮紱濡傛湁鏂版彁浜わ紝鍏堥槄璇诲彉鍖栵紝涓嶈涓轰簡鍖归厤鏈枃浠惰€屽己鍒堕噸缃伐浣滃尯銆傞渶瑕佺爺绌舵棫鍩虹嚎鏃朵娇鐢ㄤ笂闈㈢殑瀹屾暣鎻愪氦 ID銆?
 
-运行 Android 另需：BIOS/UEFI 虚拟化启用、Windows Hypervisor Platform（WHPX）启用并重启、足够内存与磁盘，以及本地端口 5048/5580/5581 可用。这些主机条件不会随文件复制迁移。
+杩愯 Android 鍙﹂渶锛欱IOS/UEFI 铏氭嫙鍖栧惎鐢ㄣ€乄indows Hypervisor Platform锛圵HPX锛夊惎鐢ㄥ苟閲嶅惎銆佽冻澶熷唴瀛樹笌纾佺洏锛屼互鍙婃湰鍦扮鍙?5048/5580/5581 鍙敤銆傝繖浜涗富鏈烘潯浠朵笉浼氶殢鏂囦欢澶嶅埗杩佺Щ銆?
 
-### 不迁移旧手机
+### 涓嶈縼绉绘棫鎵嬫満
 
-从仓库构建成功后运行 `Start-DroidNest.cmd`，按照图形向导接受所需条款并联网安装运行时。不要使用已删除的 `Setup-Components.ps1` 或 `Import-LocalRuntime.ps1`。
+浠庝粨搴撴瀯寤烘垚鍔熷悗杩愯 `Start-DroidNest.cmd`锛屾寜鐓у浘褰㈠悜瀵兼帴鍙楁墍闇€鏉℃骞惰仈缃戝畨瑁呰繍琛屾椂銆備笉瑕佷娇鐢ㄥ凡鍒犻櫎鐨?`Setup-Components.ps1` 鎴?`Import-LocalRuntime.ps1`銆?
 
-### 使用私人迁移包
+### 浣跨敤绉佷汉杩佺Щ鍖?
 
-1. 校验 ZIP 的 SHA-256 与随包校验文件一致，例如：
+1. 鏍￠獙 ZIP 鐨?SHA-256 涓庨殢鍖呮牎楠屾枃浠朵竴鑷达紝渚嬪锛?
 
    ```powershell
-   Get-FileHash -Algorithm SHA256 .\DroidNest-v0.2.0-win-x64-LOCAL-ONLY-with-data.zip
-   Get-Content .\DroidNest-v0.2.0-win-x64-LOCAL-ONLY-with-data-SHA256SUMS.txt
+   Get-FileHash -Algorithm SHA256 .\DroidNest-v0.3.0-win-x64-LOCAL-ONLY-with-data.zip
+   Get-Content .\DroidNest-v0.3.0-win-x64-LOCAL-ONLY-with-data-SHA256SUMS.txt
    ```
 
-2. 将 ZIP 完整解压到独立目录，不直接在 ZIP 中运行，不覆盖新克隆的源码目录。
-3. 在目标 Windows 用户下启动解压目录中的 `Start-DroidNest.cmd`，明确同意迁移到该用户的 `%LOCALAPPDATA%\DroidNest`。
-4. 迁移只复制目标不存在的对应目录，保留原件，不合并两部手机。目标已有 `runtime` 或 `data` 时先确认应保留哪份并备份；不要先运行空白手机创建目标数据，也不要直接覆盖现有数据。
-5. 确认桌面持续显示、应用和重要数据存在；正常关闭后再次打开，验证仍保留。再关闭该客户端，按需从源码目录启动开发版；同一用户使用相同持久目录，不同时运行两份客户端。
+2. 灏?ZIP 瀹屾暣瑙ｅ帇鍒扮嫭绔嬬洰褰曪紝涓嶇洿鎺ュ湪 ZIP 涓繍琛岋紝涓嶈鐩栨柊鍏嬮殕鐨勬簮鐮佺洰褰曘€?
+3. 鍦ㄧ洰鏍?Windows 鐢ㄦ埛涓嬪惎鍔ㄨВ鍘嬬洰褰曚腑鐨?`Start-DroidNest.cmd`锛屾槑纭悓鎰忚縼绉诲埌璇ョ敤鎴风殑 `%LOCALAPPDATA%\DroidNest`銆?
+4. 杩佺Щ鍙鍒剁洰鏍囦笉瀛樺湪鐨勫搴旂洰褰曪紝淇濈暀鍘熶欢锛屼笉鍚堝苟涓ら儴鎵嬫満銆傜洰鏍囧凡鏈?`runtime` 鎴?`data` 鏃跺厛纭搴斾繚鐣欏摢浠藉苟澶囦唤锛涗笉瑕佸厛杩愯绌虹櫧鎵嬫満鍒涘缓鐩爣鏁版嵁锛屼篃涓嶈鐩存帴瑕嗙洊鐜版湁鏁版嵁銆?
+5. 纭妗岄潰鎸佺画鏄剧ず銆佸簲鐢ㄥ拰閲嶈鏁版嵁瀛樺湪锛涙甯稿叧闂悗鍐嶆鎵撳紑锛岄獙璇佷粛淇濈暀銆傚啀鍏抽棴璇ュ鎴风锛屾寜闇€浠庢簮鐮佺洰褰曞惎鍔ㄥ紑鍙戠増锛涘悓涓€鐢ㄦ埛浣跨敤鐩稿悓鎸佷箙鐩綍锛屼笉鍚屾椂杩愯涓や唤瀹㈡埛绔€?
 
-诊断命令（在客户端/仓库根目录执行）：
+璇婃柇鍛戒护锛堝湪瀹㈡埛绔?浠撳簱鏍圭洰褰曟墽琛岋級锛?
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\Check-Environment.ps1 -Json
 ```
 
-默认诊断缺少运行时时返回失败不等于客户端无法打开；`Start-DroidNest.cmd` 使用启动器模式，让图形向导处理运行时缺失。
+榛樿璇婃柇缂哄皯杩愯鏃舵椂杩斿洖澶辫触涓嶇瓑浜庡鎴风鏃犳硶鎵撳紑锛沗Start-DroidNest.cmd` 浣跨敤鍚姩鍣ㄦā寮忥紝璁╁浘褰㈠悜瀵煎鐞嗚繍琛屾椂缂哄け銆?
 
-## 4. 待继续的开发建议与当前状态
+## 4. 寰呯户缁殑寮€鍙戝缓璁笌褰撳墠鐘舵€?
 
-下面恢复的是前次 Codex 的建议，不是重新确认的缺陷结论。实现前应核对当前代码与调用方；行号容易变化，因此以文件和符号定位。状态以 `main` 最新提交为准。
+涓嬮潰鎭㈠鐨勬槸鍓嶆 Codex 鐨勫缓璁紝涓嶆槸閲嶆柊纭鐨勭己闄风粨璁恒€傚疄鐜板墠搴旀牳瀵瑰綋鍓嶄唬鐮佷笌璋冪敤鏂癸紱琛屽彿瀹规槗鍙樺寲锛屽洜姝や互鏂囦欢鍜岀鍙峰畾浣嶃€傜姸鎬佷互 `main` 鏈€鏂版彁浜や负鍑嗐€?
 
-|优先级|建议|状态|起点与约束|
+|浼樺厛绾寤鸿|鐘舵€亅璧风偣涓庣害鏉焲
 |---|---|---|---|
-|优先|运行时完整性增加关键文件 SHA-256 校验|已完成（`1a6c2e3`，记录 format 2）|`src/RuntimeInstaller.cs` 的安装记录和验证；旧大小记录通过向导重新安装，不改写手机数据|
-|优先|固定 Android 下载组件可信 SHA-256，或使用签名元数据|受阻：Platform Tools 已固定；2026-11-12 复核 `repository2-3.xml` 895 条与 `sys-img2-3.xml` 66 条校验全部为 SHA-1，模拟器归档页无 SHA-256|`src/RuntimeInstaller.cs`；不自行用不可信下载结果建立信任锚|
-|优先|统一、动态计算磁盘空间需求|已完成（`1a6c2e3`，配额感知策略）|`src/RuntimeInstaller.cs`、`src/AndroidRuntime.cs`；安装按下载、ZIP 展开、分配余量与签名输出动态检查|
-|优先|增加干净 Windows CI/验收矩阵|已完成：`.github/workflows/windows.yml` 远程运行 `43054551399`、`43054945598`、`43055075612`、`43065191544` 通过；真实 GUI/WHPX/硬件验收仍待执行|`VALIDATION.md`；区分自动脚本检查与真实硬件验收，不可用前者冒充后者|
-|稳定性|HTTP Range 断点续传|已完成：校验前缀、核对 `Content-Range`，范围不符或校验失败时重新完整下载|`src/RuntimeInstaller.cs` 的 `DownloadAsync`/`CopyPartAsync`；真实网络续传冒烟通过|
-|稳定性|日志轮换和清理|已完成：保留最近 16 个、最多 64 MiB，跳过 10 分钟内写入的文件|`src/AndroidRuntime.cs` 的 `TrimLogs`|
-|稳定性|保留自定义分辨率、内存、CPU、GPU 配置，或提供配置页|已完成（无配置页）：保留 config.ini 调优键，非法值回退，启动参数使用同一 GPU 模式|`src/AvdConfig.cs`、`src/AndroidRuntime.cs` 的 `PrepareAvd()`|
-|稳定性|Emulator/scrcpy 异常退出后的恢复入口|已完成：画面进程退出时自动重连（Android 不重启），模拟器/ADB 退出时显示原因与日志并可重启|`src/AndroidRuntime.cs` 的 `ObserveExitAsync`/`TryReconnectDisplayAsync`；`src/MainWindow.cs` 重新接入画面|
-|功能|关闭自动启动手机的选项|已完成：主界面复选框，保存到客户端 `settings.json`|`src/ClientSettings.cs`、`src/MainWindow.cs`|
-|功能|手机数据一键备份/恢复|已完成：ZIP + SHA-256，恢复前校验，拒绝覆盖/合并和穿越/链接条目|`src/PhoneBackup.cs`、主界面“备份/恢复手机数据”|
-|功能|APK 安装前展示包名、版本和签名摘要|已完成：aapt2 读取包名/版本，apksigner 或 v1 证书读取 SHA-256，确认后才安装|`src/ApkInspector.cs`；缺少工具时提示，不代替用户决定|
-|功能|运行时修复、更新检查、版本迁移提示|部分完成：启动时 `DescribeHealth` 识别旧记录、版本漂移、缺 Build Tools，并提供“修复运行环境…”；没有联网检查新版本|`RuntimeInstaller.DescribeHealth`、`SetupWindow` 修复模式|
-|发布|EXE 和发布校验文件签名|已决定：非商业发布不签名，使用 SHA-256 校验；`Sign-Release.ps1` 保留为可选工具（PFX/证书存储），自签名验证失败不会冒充发布签名|如需 Windows 可信发布者再申请 CA 证书或云签名；当前不阻塞发布|
-|后续评估|SDK-style/.NET 8 WPF 迁移|未决定|原建议仅为“后续可评估”，未决定迁移，不默认执行|
+|浼樺厛|杩愯鏃跺畬鏁存€у鍔犲叧閿枃浠?SHA-256 鏍￠獙|宸插畬鎴愶紙`1a6c2e3`锛岃褰?format 2锛墊`src/RuntimeInstaller.cs` 鐨勫畨瑁呰褰曞拰楠岃瘉锛涙棫澶у皬璁板綍閫氳繃鍚戝閲嶆柊瀹夎锛屼笉鏀瑰啓鎵嬫満鏁版嵁|
+|浼樺厛|鍥哄畾 Android 涓嬭浇缁勪欢鍙俊 SHA-256锛屾垨浣跨敤绛惧悕鍏冩暟鎹畖鍙楅樆锛歅latform Tools 宸插浐瀹氾紱2026-11-12 澶嶆牳 `repository2-3.xml` 895 鏉′笌 `sys-img2-3.xml` 66 鏉℃牎楠屽叏閮ㄤ负 SHA-1锛屾ā鎷熷櫒褰掓。椤垫棤 SHA-256|`src/RuntimeInstaller.cs`锛涗笉鑷鐢ㄤ笉鍙俊涓嬭浇缁撴灉寤虹珛淇′换閿殀
+|浼樺厛|缁熶竴銆佸姩鎬佽绠楃鐩樼┖闂撮渶姹倈宸插畬鎴愶紙`1a6c2e3`锛岄厤棰濇劅鐭ョ瓥鐣ワ級|`src/RuntimeInstaller.cs`銆乣src/AndroidRuntime.cs`锛涘畨瑁呮寜涓嬭浇銆乑IP 灞曞紑銆佸垎閰嶄綑閲忎笌绛惧悕杈撳嚭鍔ㄦ€佹鏌
+|浼樺厛|澧炲姞骞插噣 Windows CI/楠屾敹鐭╅樀|宸插畬鎴愶細`.github/workflows/windows.yml` 杩滅▼杩愯 `43054551399`銆乣43054945598`銆乣43055075612`銆乣43065191544` 閫氳繃锛涚湡瀹?GUI/WHPX/纭欢楠屾敹浠嶅緟鎵ц|`VALIDATION.md`锛涘尯鍒嗚嚜鍔ㄨ剼鏈鏌ヤ笌鐪熷疄纭欢楠屾敹锛屼笉鍙敤鍓嶈€呭啋鍏呭悗鑰厊
+|绋冲畾鎬HTTP Range 鏂偣缁紶|宸插畬鎴愶細鏍￠獙鍓嶇紑銆佹牳瀵?`Content-Range`锛岃寖鍥翠笉绗︽垨鏍￠獙澶辫触鏃堕噸鏂板畬鏁翠笅杞絴`src/RuntimeInstaller.cs` 鐨?`DownloadAsync`/`CopyPartAsync`锛涚湡瀹炵綉缁滅画浼犲啋鐑熼€氳繃|
+|绋冲畾鎬鏃ュ織杞崲鍜屾竻鐞唡宸插畬鎴愶細淇濈暀鏈€杩?16 涓€佹渶澶?64 MiB锛岃烦杩?10 鍒嗛挓鍐呭啓鍏ョ殑鏂囦欢|`src/AndroidRuntime.cs` 鐨?`TrimLogs`|
+|绋冲畾鎬淇濈暀鑷畾涔夊垎杈ㄧ巼銆佸唴瀛樸€丆PU銆丟PU 閰嶇疆锛屾垨鎻愪緵閰嶇疆椤祙宸插畬鎴愶紙鏃犻厤缃〉锛夛細淇濈暀 config.ini 璋冧紭閿紝闈炴硶鍊煎洖閫€锛屽惎鍔ㄥ弬鏁颁娇鐢ㄥ悓涓€ GPU 妯″紡|`src/AvdConfig.cs`銆乣src/AndroidRuntime.cs` 鐨?`PrepareAvd()`|
+|绋冲畾鎬Emulator/scrcpy 寮傚父閫€鍑哄悗鐨勬仮澶嶅叆鍙宸插畬鎴愶細鐢婚潰杩涚▼閫€鍑烘椂鑷姩閲嶈繛锛圓ndroid 涓嶉噸鍚級锛屾ā鎷熷櫒/ADB 閫€鍑烘椂鏄剧ず鍘熷洜涓庢棩蹇楀苟鍙噸鍚瘄`src/AndroidRuntime.cs` 鐨?`ObserveExitAsync`/`TryReconnectDisplayAsync`锛沗src/MainWindow.cs` 閲嶆柊鎺ュ叆鐢婚潰|
+|鍔熻兘|鍏抽棴鑷姩鍚姩鎵嬫満鐨勯€夐」|宸插畬鎴愶細涓荤晫闈㈠閫夋锛屼繚瀛樺埌瀹㈡埛绔?`settings.json`|`src/ClientSettings.cs`銆乣src/MainWindow.cs`|
+|鍔熻兘|鎵嬫満鏁版嵁涓€閿浠?鎭㈠|宸插畬鎴愶細ZIP + SHA-256锛屾仮澶嶅墠鏍￠獙锛屾嫆缁濊鐩?鍚堝苟鍜岀┛瓒?閾炬帴鏉＄洰|`src/PhoneBackup.cs`銆佷富鐣岄潰鈥滃浠?鎭㈠鎵嬫満鏁版嵁鈥潀
+|鍔熻兘|APK 瀹夎鍓嶅睍绀哄寘鍚嶃€佺増鏈拰绛惧悕鎽樿|宸插畬鎴愶細aapt2 璇诲彇鍖呭悕/鐗堟湰锛宎pksigner 鎴?v1 璇佷功璇诲彇 SHA-256锛岀‘璁ゅ悗鎵嶅畨瑁厊`src/ApkInspector.cs`锛涚己灏戝伐鍏锋椂鎻愮ず锛屼笉浠ｆ浛鐢ㄦ埛鍐冲畾|
+|鍔熻兘|杩愯鏃朵慨澶嶃€佹洿鏂版鏌ャ€佺増鏈縼绉绘彁绀簗閮ㄥ垎瀹屾垚锛氬惎鍔ㄦ椂 `DescribeHealth` 璇嗗埆鏃ц褰曘€佺増鏈紓绉汇€佺己 Build Tools锛屽苟鎻愪緵鈥滀慨澶嶈繍琛岀幆澧冣€︹€濓紱娌℃湁鑱旂綉妫€鏌ユ柊鐗堟湰|`RuntimeInstaller.DescribeHealth`銆乣SetupWindow` 淇妯″紡|
+|鍙戝竷|EXE 鍜屽彂甯冩牎楠屾枃浠剁鍚峾宸插喅瀹氾細闈炲晢涓氬彂甯冧笉绛惧悕锛屼娇鐢?SHA-256 鏍￠獙锛沗Sign-Release.ps1` 淇濈暀涓哄彲閫夊伐鍏凤紙PFX/璇佷功瀛樺偍锛夛紝鑷鍚嶉獙璇佸け璐ヤ笉浼氬啋鍏呭彂甯冪鍚峾濡傞渶 Windows 鍙俊鍙戝竷鑰呭啀鐢宠 CA 璇佷功鎴栦簯绛惧悕锛涘綋鍓嶄笉闃诲鍙戝竷|
+|鍚庣画璇勪及|SDK-style/.NET 8 WPF 杩佺Щ|鏈喅瀹殀鍘熷缓璁粎涓衡€滃悗缁彲璇勪及鈥濓紝鏈喅瀹氳縼绉伙紝涓嶉粯璁ゆ墽琛寍
 
-已完成的：优先加固三项、稳定性四项、功能四项（运行时更新检查只覆盖本地记录/版本一致性，不含联网检查）。仍受阻：三个组件可信 SHA-256。发布签名已决定为非商业不签名、使用 SHA-256；其余建议（自动检查更新、.NET 8 迁移）未实现。
+宸插畬鎴愮殑锛氫紭鍏堝姞鍥轰笁椤广€佺ǔ瀹氭€у洓椤广€佸姛鑳藉洓椤癸紙杩愯鏃舵洿鏂版鏌ュ彧瑕嗙洊鏈湴璁板綍/鐗堟湰涓€鑷存€э紝涓嶅惈鑱旂綉妫€鏌ワ級銆備粛鍙楅樆锛氫笁涓粍浠跺彲淇?SHA-256銆傚彂甯冪鍚嶅凡鍐冲畾涓洪潪鍟嗕笟涓嶇鍚嶃€佷娇鐢?SHA-256锛涘叾浣欏缓璁紙鑷姩妫€鏌ユ洿鏂般€?NET 8 杩佺Щ锛夋湭瀹炵幇銆?
 
-### 相关文件导航
+### 鐩稿叧鏂囦欢瀵艰埅
 
-- `src/RuntimeInstaller.cs`：组件元数据、下载、校验、解压、本地准备和安装记录。
-- `src/SetupWindow.cs`：安装向导。
-- `src/AppPaths.cs`：持久路径及旧目录迁移。
-- `src/AndroidRuntime.cs`：宿主检查、AVD、Android 进程与操作。
-- `src/AvdConfig.cs`：AVD `config.ini` 结构键与用户调优键合并、取值校验。
-- `src/ClientSettings.cs`：客户端设置（自动启动）读写。
-- `src/PhoneBackup.cs`：手机数据 ZIP 备份/恢复与边界校验。
-- `src/ApkInspector.cs`：安装前读取包名、版本与签名证书。
-- `src/PhoneDisplayHost.cs`：原生视频子窗口集成。
-- `src/MainWindow.cs`、`src/Program.cs`：主 UI 与启动入口。
-- `build.ps1`、`New-PortablePackage.ps1`、`Sign-Release.ps1`、`Check-Environment.ps1`：构建、白名单打包、发布签名和诊断。
-- `README.md`、`CHANGELOG.md`、`RELEASE-NOTES.md`、`VALIDATION.md`：使用约定、版本记录和验证证据。
+- `src/RuntimeInstaller.cs`锛氱粍浠跺厓鏁版嵁銆佷笅杞姐€佹牎楠屻€佽В鍘嬨€佹湰鍦板噯澶囧拰瀹夎璁板綍銆?
+- `src/SetupWindow.cs`锛氬畨瑁呭悜瀵笺€?
+- `src/AppPaths.cs`锛氭寔涔呰矾寰勫強鏃х洰褰曡縼绉汇€?
+- `src/AndroidRuntime.cs`锛氬涓绘鏌ャ€丄VD銆丄ndroid 杩涚▼涓庢搷浣溿€?
+- `src/AvdConfig.cs`锛欰VD `config.ini` 缁撴瀯閿笌鐢ㄦ埛璋冧紭閿悎骞躲€佸彇鍊兼牎楠屻€?
+- `src/ClientSettings.cs`锛氬鎴风璁剧疆锛堣嚜鍔ㄥ惎鍔級璇诲啓銆?
+- `src/PhoneBackup.cs`锛氭墜鏈烘暟鎹?ZIP 澶囦唤/鎭㈠涓庤竟鐣屾牎楠屻€?
+- `src/ApkInspector.cs`锛氬畨瑁呭墠璇诲彇鍖呭悕銆佺増鏈笌绛惧悕璇佷功銆?
+- `src/PhoneDisplayHost.cs`锛氬師鐢熻棰戝瓙绐楀彛闆嗘垚銆?
+- `src/MainWindow.cs`銆乣src/Program.cs`锛氫富 UI 涓庡惎鍔ㄥ叆鍙ｃ€?
+- `build.ps1`銆乣New-PortablePackage.ps1`銆乣Sign-Release.ps1`銆乣Check-Environment.ps1`锛氭瀯寤恒€佺櫧鍚嶅崟鎵撳寘銆佸彂甯冪鍚嶅拰璇婃柇銆?
+- `README.md`銆乣CHANGELOG.md`銆乣RELEASE-NOTES.md`銆乣VALIDATION.md`锛氫娇鐢ㄧ害瀹氥€佺増鏈褰曞拰楠岃瘉璇佹嵁銆?
 
-## 5. 可以直接发给新电脑上的助手
+## 5. 鍙互鐩存帴鍙戠粰鏂扮數鑴戜笂鐨勫姪鎵?
 
-> 请先阅读仓库根目录 HANDOFF.md、README.md 和 VALIDATION.md，恢复 DroidNest 工作。`main` 已包含优先加固与稳定性/功能加固：安装记录 SHA-256、动态磁盘预算、下载续传、日志轮换、AVD 配置保留、画面自动重连、自动启动开关、手机数据备份/恢复、APK 信息与运行时健康检查；远程 Actions 已通过。仍未解决：Emulator、系统镜像、Build Tools 的独立可信 SHA-256；EXE 非商业发布采用未签名 + SHA-256 校验，`Sign-Release.ps1` 仅作可选。先检查新机仓库当前状态并保留已有变更；根据交接文件第 4 节状态确定下一轮范围，再继续实现和针对性验证。不要重复已完成项，不要删除或覆盖手机数据，不要把私人运行时/数据/密钥提交到 Git，不要把历史验证当作新机已通过。
+> 璇峰厛闃呰浠撳簱鏍圭洰褰?HANDOFF.md銆丷EADME.md 鍜?VALIDATION.md锛屾仮澶?DroidNest 宸ヤ綔銆俙main` 宸插寘鍚紭鍏堝姞鍥轰笌绋冲畾鎬?鍔熻兘鍔犲浐锛氬畨瑁呰褰?SHA-256銆佸姩鎬佺鐩橀绠椼€佷笅杞界画浼犮€佹棩蹇楄疆鎹€丄VD 閰嶇疆淇濈暀銆佺敾闈㈣嚜鍔ㄩ噸杩炪€佽嚜鍔ㄥ惎鍔ㄥ紑鍏炽€佹墜鏈烘暟鎹浠?鎭㈠銆丄PK 淇℃伅涓庤繍琛屾椂鍋ュ悍妫€鏌ワ紱杩滅▼ Actions 宸查€氳繃銆備粛鏈В鍐筹細Emulator銆佺郴缁熼暅鍍忋€丅uild Tools 鐨勭嫭绔嬪彲淇?SHA-256锛汦XE 闈炲晢涓氬彂甯冮噰鐢ㄦ湭绛惧悕 + SHA-256 鏍￠獙锛宍Sign-Release.ps1` 浠呬綔鍙€夈€傚厛妫€鏌ユ柊鏈轰粨搴撳綋鍓嶇姸鎬佸苟淇濈暀宸叉湁鍙樻洿锛涙牴鎹氦鎺ユ枃浠剁 4 鑺傜姸鎬佺‘瀹氫笅涓€杞寖鍥达紝鍐嶇户缁疄鐜板拰閽堝鎬ч獙璇併€備笉瑕侀噸澶嶅凡瀹屾垚椤癸紝涓嶈鍒犻櫎鎴栬鐩栨墜鏈烘暟鎹紝涓嶈鎶婄浜鸿繍琛屾椂/鏁版嵁/瀵嗛挜鎻愪氦鍒?Git锛屼笉瑕佹妸鍘嗗彶楠岃瘉褰撲綔鏂版満宸查€氳繃銆?
 
-## 6. 历史追溯（仅旧机可选）
+## 6. 鍘嗗彶杩芥函锛堜粎鏃ф満鍙€夛級
 
-原 Codex 会话 ID：`01a1c969-d84e-78d1-bcc4-960f7081b384`。
+鍘?Codex 浼氳瘽 ID锛歚01a1c969-d84e-78d1-bcc4-960f7081b384`銆?
 
-旧机记录：`C:\Users\WXX\.codex\sessions\2026\11\11\rollout-2026-11-11T15-01-59-01a1c969-d84e-78d1-bcc4-960f7081b384.jsonl`。
+鏃ф満璁板綍锛歚C:\Users\WXX\.codex\sessions\2026\11\11\rollout-2026-11-11T15-01-59-01a1c969-d84e-78d1-bcc4-960f7081b384.jsonl`銆?
 
-关键顺序：先 `git pull` → 用户请求优化建议 → Codex 报告“本次只做检查，没有修改代码” → 用户批准实施 → 服务报错。新机继续任务不依赖这个旧机绝对路径，也不需要复制包含其他历史或凭据的工具配置目录。
+鍏抽敭椤哄簭锛氬厛 `git pull` 鈫?鐢ㄦ埛璇锋眰浼樺寲寤鸿 鈫?Codex 鎶ュ憡鈥滄湰娆″彧鍋氭鏌ワ紝娌℃湁淇敼浠ｇ爜鈥?鈫?鐢ㄦ埛鎵瑰噯瀹炴柦 鈫?鏈嶅姟鎶ラ敊銆傛柊鏈虹户缁换鍔′笉渚濊禆杩欎釜鏃ф満缁濆璺緞锛屼篃涓嶉渶瑕佸鍒跺寘鍚叾浠栧巻鍙叉垨鍑嵁鐨勫伐鍏烽厤缃洰褰曘€?
