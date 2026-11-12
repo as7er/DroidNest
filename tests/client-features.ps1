@@ -223,6 +223,8 @@ try {
         try {
             $diagnostic = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repo 'Check-Environment.ps1') -Json 2>&1
             $diagnosticExit = $LASTEXITCODE
+            # GitHub Actions' PowerShell wrapper exits with the last native code; keep the expected preflight failure local.
+            $global:LASTEXITCODE = 0
             if ($diagnosticExit -ne 0 -and $diagnosticExit -ne 1) { throw ('Preflight diagnostic exited with ' + $diagnosticExit) }
             $report = (($diagnostic | ForEach-Object { [string]$_ }) -join [Environment]::NewLine) | ConvertFrom-Json
             $diskChecks = @($report.checks | Where-Object { $_.name -like 'disk:*' })
