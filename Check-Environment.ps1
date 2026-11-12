@@ -130,7 +130,7 @@ foreach ($relative in $probeDirectories) {
     } catch { Add-Check ('write:' + $relative) 'fail' ('持久目录不可写，请检查当前用户权限，不要通过自动提权解决：' + $directory + '；' + $_.Exception.Message) }
     try {
         if ($null -ne $diskPolicyError) { throw ('无法加载客户端共享磁盘策略：' + $diskPolicyError) }
-        [long]$available = $diskAvailableMethod.Invoke($null, [object[]]@($directory))
+        [long]$available = $diskAvailableMethod.Invoke($null, [object[]]@([string]$directory))
         $space = '{0:N1}' -f ($available / 1GB)
         if ($available -ge $phoneReserveBytes) { Add-Check ('disk:' + $relative) 'pass' "当前用户可用磁盘空间 $space GiB：$directory" }
         else { Add-Check ('disk:' + $relative) 'fail' "启动前至少需要 $phoneReserveGiB GiB 当前用户可用空间（当前 $space GiB）：$directory。请释放空间，勿删除需要保留的手机数据。" }

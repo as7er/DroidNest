@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- 修复 `Check-Environment.ps1` 诊断模式在 Windows PowerShell 5.1 下把 `Join-Path` 结果直接传给反射方法导致的 `PSObject` 转换错误；`disk:` 检查现在能正常报告可用空间。`tests/client-features.ps1` 新增预检回归，执行 `-Json` 并拒绝同类误报。
+
 ## 0.3.0 — 客户端加固、恢复与数据工具（2026-11-12）
 
 - 安装记录升级 format 2，关键运行文件新增 SHA-256 校验，拒绝同大小损坏、缺失摘要和旧大小记录；旧记录通过向导重新安装，不改写手机数据。无记录的显式旧版导入保留原有较弱检查，记录未签名。

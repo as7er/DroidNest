@@ -212,7 +212,33 @@ try {
     $unreadable = $inspect.Invoke($null, @([string]$emptyRoot, [string]$missing))
     if (-not [string]::IsNullOrEmpty([string](Field $unreadable 'Package'))) { throw 'APK without manifest reported a package.' }
 
-    Write-Output 'PASS: preferences, phone backup/restore boundaries, runtime health and binary manifest inspection.'
+    # The public preflight must resolve the disk policy when its probe path comes from Join-Path.
+    # Windows PowerShell 5.1 reflection calls do not unwrap the resulting PSObject automatically.
+    # Run it only without an installed runtime so the probe cannot touch real phone data; CI covers this path.
+    $preflightRoot = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)) 'DroidNest'
+    if (Test-Path -LiteralPath (Join-Path $preflightRoot 'runtime/installation.json') -PathType Leaf) {
+        Write-Output 'SKIP: preflight disk diagnostic (installed runtime present; CI covers the clean-root path).'
+    } else {
+        $preflightRootExisted = Test-Path -LiteralPath $preflightRoot -PathType Container
+        try {
+            $diagnostic = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repo 'Check-Environment.ps1') -Json 2>&1
+            $diagnosticExit = $LASTEXITCODE
+            if ($diagnosticExit -ne 0 -and $diagnosticExit -ne 1) { throw ('Preflight diagnostic exited with ' + $diagnosticExit) }
+            $report = (($diagnostic | ForEach-Object { [string]$_ }) -join [Environment]::NewLine) | ConvertFrom-Json
+            $diskChecks = @($report.checks | Where-Object { $_.name -like 'disk:*' })
+            if ($diskChecks.Count -eq 0) { throw 'Preflight diagnostic did not report the disk policy.' }
+            foreach ($check in $diskChecks) {
+                if ([string]$check.message -match 'PSObject|无法确认启动前可用磁盘空间') { throw ('Preflight disk diagnostic failed: ' + $check.message) }
+            }
+        } finally {
+            # The diagnostic creates the state root to test writability; undo that only when the test created it.
+            if (-not $preflightRootExisted -and (Test-Path -LiteralPath $preflightRoot -PathType Container)) {
+                if (@(Get-ChildItem -LiteralPath $preflightRoot -Force).Count -eq 0) { Remove-Item -LiteralPath $preflightRoot -Force }
+            }
+        }
+    }
+
+    Write-Output 'PASS: preferences, phone backup/restore boundaries, runtime health, binary manifest inspection and preflight disk diagnostic.'
 } finally {
     if (Test-Path -LiteralPath $workspace) { Remove-Item -LiteralPath $workspace -Recurse -Force }
 }

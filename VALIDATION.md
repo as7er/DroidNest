@@ -14,9 +14,9 @@
 | 安装器路径 / ZIP 边界 | `tests/installer-boundary-smoke.ps1` | 直接调用已编译安装器的路径和解压逻辑，验证路径穿越、绝对路径、ADS、Windows 设备名、尾部别名、链接、错误 ZIP 布局及损坏 ZIP 被拒绝，并以有效 ZIP 验证成功路径。全部输入为临时合成文件，检查暂存区外的哨兵文件不变；不启动 GUI、不联网、不构造真实安装器或访问用户运行时。 |
 | 安装记录 / 磁盘 / 哈希边界 | `tests/priority-hardening.ps1` | 隔离检查安装记录、磁盘预算与哈希行为；不替代真实卷配额、下载、GUI 或硬件验收。 |
 | 续传 / AVD 配置 / 日志轮换 | `tests/stability-hardening.ps1` | 用合成字节流检查 `Content-Range` 协商、部分文件范围、续传后的 SHA-256 校验、损坏前缀拒绝；检查 `PrepareAvd` 默认值与用户调优项保留（含非法值回退）；检查日志数量与总大小上限且不删除仍在写入的日志。不联网、不启动模拟器。 |
-| 设置 / 备份恢复 / 运行时健康 | `tests/client-features.ps1` | 检查自动启动设置的默认值、保存往返与损坏文件回退；检查手机数据 ZIP 备份条目、SHA-256 校验文件、恢复字节一致、拒绝覆盖现有数据和拒绝外部顶层路径/路径穿越/校验不符；检查健康报告区分旧记录、版本漂移与缺少 Build Tools。不启动模拟器、不访问真实手机数据。 |
+| 设置 / 备份恢复 / 运行时健康 | `tests/client-features.ps1` | 检查自动启动设置的默认值、保存往返与损坏文件回退；检查手机数据 ZIP 备份条目、SHA-256 校验文件、恢复字节一致、拒绝覆盖现有数据和拒绝外部顶层路径/路径穿越/校验不符；检查健康报告区分旧记录、版本漂移与缺少 Build Tools；执行 `Check-Environment.ps1 -Json`，拒绝磁盘策略的 `PSObject` 反射误报。不启动模拟器、不访问真实手机数据。 |
 
-这些脚本位于已提交的 `tests/`，不依赖被忽略的 `verification/`。工作流不使用私人运行时、手机数据或签名机密，不上传打包产物，也不声称验证 WHPX、GPU 或真实手机运行。测试临时目录在 `finally` 中清理；仓库现有 `dist` 和 `%LOCALAPPDATA%\DroidNest` 不受测试修改。
+这些脚本位于已提交的 `tests/`，不依赖被忽略的 `verification/`。工作流不使用私人运行时、手机数据或签名机密，不上传打包产物，也不声称验证 WHPX、GPU 或真实手机运行。测试临时目录在 `finally` 中清理；测试不修改已安装的运行时或手机数据，打包测试也不写入仓库现有 `dist`。预检回归仅在不存在 `runtime/installation.json` 时运行诊断，并清理测试创建的空状态目录；检测到已安装运行时会跳过，由 CI 覆盖无运行时路径。
 
 在仓库根目录的 Windows PowerShell 5.1 中，合并后依次运行一次：
 
@@ -62,8 +62,23 @@
 - `build.ps1` 与 `New-PortablePackage.ps1 -Version 0.3.0` 生成 `dist/DroidNest-v0.3.0-win-x64-client.zip`：13 个白名单文件，`DroidNest.exe` 版本 0.3.0.0，未签名（非商业发布策略）；文件 SHA-256 `38d1146b1a50fb33a641335aa8510238440e12133a36f5b60cce667a8f2fb8ad`，与同名校验文件一致。
 - 本地六个测试脚本全部通过；远程 CI 在发布提交上通过全部七个步骤。
 - GitHub Release <https://github.com/as7er/DroidNest/releases/tag/v0.3.0> 为非草稿、非预发布，附件 ZIP 与 SHA-256 均已上传；下载回的资产 SHA-256 与本地及校验文件一致。解压后的客户端曾启动进程，但该次启动检查被手动停止，未取得 JSON/安装完成结果，不作为安装验收。
-- 未验证干净 Windows 用户/虚拟机、全新 format 2 安装端到端流程和其他硬件。
+- 发布时未验证干净 Windows 用户/虚拟机、全新 format 2 安装端到端流程和其他硬件；干净用户 format 2 全流程随后于 2026-11-12 补验，见下。
 
+
+### 2026-11-12 干净用户 v0.3.0 format 2 全流程验收
+
+- 环境：Windows 10 x64 19044，当前用户此前没有 `%LOCALAPPDATA%\DroidNest`（无 runtime/data/logs）；使用 GitHub Release 的 `DroidNest-v0.3.0-win-x64-client` 解压目录，通过 `Start-DroidNest.cmd` 启动。不是全新 Windows 安装或独立虚拟机。
+- 安装前停止占用了 5048 的外部 `F:\FMMV` adb server；DroidNest 未停止其他项目进程。向导完成在线组件准备，生成 format 2 `runtime\installation.json`（30080 字节，2026-11-12 11:18:00，SHA-256 `8877e7964ba8b4fb8c3de625c5dc1c73f80be5385fbf6e673db147ee251e7d0b`），随后自动启动 Android 11；`sys.boot_completed=1`、`am get-started-user-state 0=RUNNING_UNLOCKED`，scrcpy 5.0.1 在应用内显示真实桌面（截图仅保存在被忽略的 `verification/`）。
+- 在 Android `/sdcard` 写入文本探针和 4096 字节随机文件（SHA-256 `54c47c9aae5b544c29a2b6d347b7c2d2acda5a63691063e6a6e2f13c306debc2`）；通过界面“停止手机”正常停止（状态先“正在停止手机”后“手机未启动”，模拟器进程退出），再正常关闭窗口（5048/5580/5581 均释放）。
+- 重新通过 `Start-DroidNest.cmd` 启动：直接进入主界面而非安装向导，自动启动同一部手机；探针文件字节与 SHA-256 不变，`installation.json` 修改时间仍为 11:18:00，桌面时钟从 3:21 变为 3:28，证明为重启后的系统。
+- 边界：未覆盖全新 Windows/独立虚拟机、WHPX 不可用主机、其他 GPU/DPI/硬件、真实断网/代理矩阵和真实存储配额；发布 ZIP 的 `Check-Environment.ps1` 仍含诊断模式磁盘误报，源码修复见下节。
+
+### 2026-11-12 预检诊断修复
+
+- 诊断模式 `Check-Environment.ps1 -Json` 曾在本机报 `disk:` 失败：`类型“System.Management.Automation.PSObject”的对象无法转换为类型“System.String”`。根因是该脚本把 `Join-Path` 的结果直接传给 `MethodInfo.Invoke`；Windows PowerShell 5.1 不会自动解包 `PSObject`。改为显式 `[string]` 转换，与 `tests/` 现有反射调用写法一致。
+- 复核：`disk:` 从 fail 变为 pass（105.0 GiB 可用）；停止外部 `F:\FMMV` 的 adb server 后，5048/5580/5581 均可用。该 adb 由其他项目启动，DroidNest 按设计不停止外部进程。
+- `tests/client-features.ps1` 新增预检回归：在无安装记录的机器上执行 `-Json` 并拒绝 `PSObject`/无法确认磁盘空间误报；临时还原修复时该回归失败，恢复后通过。CI 会覆盖无运行时路径。
+- 边界：该修复只影响诊断模式，不改变安装、运行时或手机数据路径；已发布的 v0.3.0 ZIP 未包含此修复，下次打包才会带上。
 
 ## 必须单独执行的 Windows 手动验收
 
