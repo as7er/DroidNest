@@ -55,6 +55,7 @@
 - 用真实 F-Droid 2.0.2 APK 验证安装前信息：包名 `org.fdroid.fdroid`、`versionCode 2000052`、v1 证书 SHA-256 `43238d51…`；运行时缺少 Build Tools/JDK，走内置二进制 manifest 与 v1 证书回退。
 - 停止后备份 615.5 MiB ZIP，移走 `data` 再恢复，探针文件逐字节一致；随后再次启动 Android 并完成引导。
 - 边界：本次未执行全新 format 2 安装（该路径由自动测试与 2026-11-10 交互安装覆盖），未驱动 WPF 按钮，未在干净 Windows 或其他硬件验证。目录联接仅用于测试，不进入客户端包。
+- 2026-11-12 发布签名尝试：使用用户提供的 `D:\secure\DroidNest.pfx` 执行签名；证书为自签名（Subject/Issuer 均为 `CN=DroidNest`），`signtool sign` 与 DigiCert 时间戳成功，但 `signtool verify /pa` 因根证书不受信任而拒绝。随后重新构建清除测试签名，当前 `DroidNest.exe` 未签名（文件 SHA-256 `97064724…`）。正式发布签名仍需 CA 签发的代码签名证书或云签名服务。
 
 
 ## 必须单独执行的 Windows 手动验收
