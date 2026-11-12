@@ -57,6 +57,13 @@
 - 边界：本次未执行全新 format 2 安装（该路径由自动测试与 2026-11-10 交互安装覆盖），未驱动 WPF 按钮，未在干净 Windows 或其他硬件验证。目录联接仅用于测试，不进入客户端包。
 - 2026-11-12 发布签名尝试：使用用户提供的 `D:\secure\DroidNest.pfx` 执行签名；证书为自签名（Subject/Issuer 均为 `CN=DroidNest`），`signtool sign` 与 DigiCert 时间戳成功，但 `signtool verify /pa` 因根证书不受信任而拒绝。随后重新构建清除测试签名，当前 `DroidNest.exe` 未签名（文件 SHA-256 `97064724…`）。非商业发布决定不签名，改用 SHA-256 校验文件；正式签名仍需 CA 证书或云签名服务，但不再作为发布前置。
 
+### 2026-11-12 v0.3.0 发布
+
+- `build.ps1` 与 `New-PortablePackage.ps1 -Version 0.3.0` 生成 `dist/DroidNest-v0.3.0-win-x64-client.zip`：13 个白名单文件，`DroidNest.exe` 版本 0.3.0.0，未签名（非商业发布策略）；文件 SHA-256 `38d1146b1a50fb33a641335aa8510238440e12133a36f5b60cce667a8f2fb8ad`，与同名校验文件一致。
+- 本地六个测试脚本全部通过；远程 CI 在发布提交上通过全部七个步骤。
+- GitHub Release <https://github.com/as7er/DroidNest/releases/tag/v0.3.0> 为非草稿、非预发布，附件 ZIP 与 SHA-256 均已上传；下载回的资产 SHA-256 与本地及校验文件一致。解压后的客户端曾启动进程，但该次启动检查被手动停止，未取得 JSON/安装完成结果，不作为安装验收。
+- 未验证干净 Windows 用户/虚拟机、全新 format 2 安装端到端流程和其他硬件。
+
 
 ## 必须单独执行的 Windows 手动验收
 

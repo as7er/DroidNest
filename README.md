@@ -7,6 +7,7 @@
 ## 下载与首次启动
 
 仓库：<https://github.com/as7er/DroidNest>
+发布：<https://github.com/as7er/DroidNest/releases/tag/v0.3.0>
 
 1. 下载 `DroidNest-v0.3.0-win-x64-client.zip`，核对发布页的 SHA-256，完整解压（不要在 ZIP 内直接运行）。保留 `tools/SignWebView.java` 等随包文件。
 2. 双击 `Start-DroidNest.cmd`。启动器检查 Windows/x64、.NET 和客户端文件；**不会因为尚未安装 Android 运行时而拒绝打开向导**。

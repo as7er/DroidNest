@@ -16,6 +16,7 @@
 - 安装 APK 前读取包名、版本和签名证书 SHA-256：优先使用本地 Build Tools/JDK 与 apksigner，必要时回退读取 v1 证书；确认后才安装。
 - 新增 `DescribeHealth` 与“修复运行环境…”入口：识别旧安装记录、模拟器/Platform Tools 版本漂移和缺少 Build Tools，修复时保留 `data`。
 - 新增 `Sign-Release.ps1`：使用真实代码签名证书签名 `DroidNest.exe` 并验证 Authenticode；没有证书时失败，不生成自签名替代。非商业发布已决定不签名，只发布 SHA-256 校验文件；用户提供的自签名 PFX 经 `signtool verify` 拒绝后已重建为未签名 EXE。
+- 发布：GitHub Release `v0.3.0` 提供 `DroidNest-v0.3.0-win-x64-client.zip` 与 SHA-256 校验文件；EXE 未签名。
 
 ## 0.2.0 — 引导式在线安装
 
