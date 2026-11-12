@@ -124,10 +124,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Check-Environment.ps1 -Jso
 |功能|手机数据一键备份/恢复|已完成：ZIP + SHA-256，恢复前校验，拒绝覆盖/合并和穿越/链接条目|`src/PhoneBackup.cs`、主界面“备份/恢复手机数据”|
 |功能|APK 安装前展示包名、版本和签名摘要|已完成：aapt2 读取包名/版本，apksigner 或 v1 证书读取 SHA-256，确认后才安装|`src/ApkInspector.cs`；缺少工具时提示，不代替用户决定|
 |功能|运行时修复、更新检查、版本迁移提示|部分完成：启动时 `DescribeHealth` 识别旧记录、版本漂移、缺 Build Tools，并提供“修复运行环境…”；没有联网检查新版本|`RuntimeInstaller.DescribeHealth`、`SetupWindow` 修复模式|
-|发布|EXE 和发布校验文件签名|受阻：用户提供的 PFX 为自签名证书（`CN=DroidNest`），`signtool verify` 因根不受信任拒绝；已重建清除测试签名。脚本支持 PFX/证书存储两种模式|需要 CA 签发的代码签名证书或 Azure Trusted Signing；自签名只可用于内部测试|
+|发布|EXE 和发布校验文件签名|已决定：非商业发布不签名，使用 SHA-256 校验；`Sign-Release.ps1` 保留为可选工具（PFX/证书存储），自签名验证失败不会冒充发布签名|如需 Windows 可信发布者再申请 CA 证书或云签名；当前不阻塞发布|
 |后续评估|SDK-style/.NET 8 WPF 迁移|未决定|原建议仅为“后续可评估”，未决定迁移，不默认执行|
 
-已完成的：优先加固三项、稳定性四项、功能四项（运行时更新检查只覆盖本地记录/版本一致性，不含联网检查）。仍受阻：三个组件可信 SHA-256、正式发布签名。其余建议（自动检查更新、.NET 8 迁移）未实现。
+已完成的：优先加固三项、稳定性四项、功能四项（运行时更新检查只覆盖本地记录/版本一致性，不含联网检查）。仍受阻：三个组件可信 SHA-256。发布签名已决定为非商业不签名、使用 SHA-256；其余建议（自动检查更新、.NET 8 迁移）未实现。
 
 ### 相关文件导航
 
@@ -146,7 +146,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Check-Environment.ps1 -Jso
 
 ## 5. 可以直接发给新电脑上的助手
 
-> 请先阅读仓库根目录 HANDOFF.md、README.md 和 VALIDATION.md，恢复 DroidNest 工作。`main` 已包含优先加固与稳定性/功能加固：安装记录 SHA-256、动态磁盘预算、下载续传、日志轮换、AVD 配置保留、画面自动重连、自动启动开关、手机数据备份/恢复、APK 信息与运行时健康检查；远程 Actions 已通过。仍未解决：Emulator、系统镜像、Build Tools 的独立可信 SHA-256，以及 EXE 的正式 Authenticode 签名。先检查新机仓库当前状态并保留已有变更；根据交接文件第 4 节状态确定下一轮范围，再继续实现和针对性验证。不要重复已完成项，不要删除或覆盖手机数据，不要把私人运行时/数据/密钥提交到 Git，不要把历史验证当作新机已通过。
+> 请先阅读仓库根目录 HANDOFF.md、README.md 和 VALIDATION.md，恢复 DroidNest 工作。`main` 已包含优先加固与稳定性/功能加固：安装记录 SHA-256、动态磁盘预算、下载续传、日志轮换、AVD 配置保留、画面自动重连、自动启动开关、手机数据备份/恢复、APK 信息与运行时健康检查；远程 Actions 已通过。仍未解决：Emulator、系统镜像、Build Tools 的独立可信 SHA-256；EXE 非商业发布采用未签名 + SHA-256 校验，`Sign-Release.ps1` 仅作可选。先检查新机仓库当前状态并保留已有变更；根据交接文件第 4 节状态确定下一轮范围，再继续实现和针对性验证。不要重复已完成项，不要删除或覆盖手机数据，不要把私人运行时/数据/密钥提交到 Git，不要把历史验证当作新机已通过。
 
 ## 6. 历史追溯（仅旧机可选）
 
